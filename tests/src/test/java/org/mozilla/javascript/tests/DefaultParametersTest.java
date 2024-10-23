@@ -86,7 +86,6 @@ public class DefaultParametersTest {
     }
 
     @Test
-    @Ignore("destructuring-not-supported-in-for-let-expressions")
     public void letExprDestructuring() throws Exception {
         // JavaScript
         final String script =
@@ -152,7 +151,6 @@ public class DefaultParametersTest {
     }
 
     @Test
-    @Ignore("destructuring-not-supported-in-for-let-expressions")
     public void letExprDestructuringFunCall() throws Exception {
         // JavaScript
         final String script =
