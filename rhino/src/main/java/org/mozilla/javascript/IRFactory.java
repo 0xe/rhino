@@ -1141,7 +1141,8 @@ public final class IRFactory {
                     try {
                         Node d =
                                 parser.createDestructuringAssignment(
-                                        node.getType(), left, right, this::transform);
+                                    node.getType() == Token.CONST ? -1 : node.getType(),
+                                        left, right, this::transform);
                         node.addChildToBack(d);
                     } finally {
                         astNodePos.pop();

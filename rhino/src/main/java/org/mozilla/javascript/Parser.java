@@ -2236,17 +2236,40 @@ public class Parser {
             Name name = null;
             int tt = peekToken(), kidPos = ts.tokenBeg;
             end = ts.tokenEnd;
+            AstNode init = null;
+            Map<String, Node> destructuringName = null;
+            Map<String, AstNode> destructuringDefault = null;
 
             if (tt == Token.LB || tt == Token.LC) {
                 // Destructuring assignment, e.g., var [a,b] = ...
 
-                // TODO: support default values inside destructured assignment
+                // Support default values inside destructured assignment
                 // eg: for (let { x = 3 } = {}) ...
-                destructuring = destructuringPrimaryExpr();
+                destructuring = destructuringAssignExpr();
                 end = getNodeEnd(destructuring);
 
-                if (!(destructuring instanceof DestructuringForm))
+                if (destructuring instanceof Assignment) {
+                    AstNode lhs = ((Assignment) destructuring).getLeft();
+                    AstNode rhs = ((Assignment) destructuring).getRight();
+
+                    String pname = currentScriptOrFn.getNextTempName();
+                    defineSymbol(Token.LP, pname, false);
+                    if (destructuringName == null) {
+                        destructuringName = new HashMap<>();
+                    }
+
+                    if (destructuringDefault == null) {
+                        destructuringDefault = new HashMap<>();
+                    }
+
+                    destructuringName.put(pname, lhs);
+                    destructuringDefault.put(pname, rhs);
+
+                    destructuring = lhs;
+                    init = rhs;
+                } else if (!(destructuring instanceof DestructuringForm)) {
                     reportError("msg.bad.assign.left", kidPos, end - kidPos);
+                }
                 markDestructuring(destructuring);
             } else {
                 // Simple variable name
@@ -2266,8 +2289,24 @@ public class Parser {
 
             Comment jsdocNode = getAndResetJsDoc();
 
-            AstNode init = null;
-            if (matchToken(Token.ASSIGN, true)) {
+            if (destructuringName != null) {
+                Node destructuringNode = new Node(Token.COMMA);
+                // Add assignment helper for each destructuring parameter
+                for (Map.Entry<String, Node> param : destructuringName.entrySet()) {
+                    AstNode defaultValue = null;
+                    defaultValue = destructuringDefault.get(param.getKey());
+                    Node assign =
+                            createDestructuringAssignment(
+                                    Token.VAR,
+                                    param.getValue(),
+                                    createName(param.getKey()),
+                                    defaultValue);
+                    destructuringNode.addChildToBack(assign);
+                }
+                currentScriptOrFn.putProp(Node.DESTRUCTURING_PARAMS, destructuringNode);
+            }
+
+            if (init == null && matchToken(Token.ASSIGN, true)) {
                 init = assignExpr();
                 end = getNodeEnd(init);
             }
