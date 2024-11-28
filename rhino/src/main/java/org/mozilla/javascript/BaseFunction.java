@@ -340,7 +340,7 @@ public class BaseFunction extends IdScriptableObject implements Function {
                                         Object[] args) {
                                     Object protoProp =
                                             ScriptableObject.getProperty(thisObj, "prototype");
-                                    if (protoProp instanceof NativeObject) {
+                                    if (protoProp instanceof IdScriptableObject) {
                                         return ScriptRuntime.jsDelegatesTo(
                                                 thisObj, (Scriptable) protoProp);
                                     }
