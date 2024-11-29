@@ -338,21 +338,18 @@ public class BaseFunction extends IdScriptableObject implements Function {
                                         Scriptable scope,
                                         Scriptable thisObj,
                                         Object[] args) {
-                                    Object protoProp =
-                                            ScriptableObject.getProperty(thisObj, "prototype");
-                                    if (protoProp instanceof IdScriptableObject) {
-                                        return ScriptRuntime.jsDelegatesTo(
-                                                thisObj, (Scriptable) protoProp);
+                                    if (thisObj != null) {
+                                        Object protoProp =
+                                                ScriptableObject.getProperty(thisObj, "prototype");
+                                        if (protoProp instanceof IdScriptableObject) {
+                                            return ScriptRuntime.jsDelegatesTo(
+                                                    thisObj, (Scriptable) protoProp);
+                                        }
                                     }
                                     throw ScriptRuntime.typeErrorById(
                                             "msg.instanceof.bad.prototype", getFunctionName());
                                 }
                             });
-            ScriptableObject desc = (ScriptableObject) cx.newObject(scope);
-            ScriptableObject.putProperty(desc, "value", ScriptableObject.EMPTY);
-            ScriptableObject.putProperty(desc, "enumerable", false);
-            ScriptableObject.putProperty(desc, "configurable", false);
-            ScriptableObject.putProperty(desc, "writable", false);
         }
         return obj;
     }
@@ -551,6 +548,26 @@ public class BaseFunction extends IdScriptableObject implements Function {
 
     protected boolean hasPrototypeProperty() {
         return prototypeProperty != null || this instanceof NativeFunction;
+    }
+
+    @Override
+    ScriptableObject buildDataDescriptorHelper(
+            int instanceIdInfo, Scriptable scope, Object value, int attr) {
+        if (instanceIdInfo == SymbolId_hasInstance) {
+            return buildDataDescriptor(scope, value, attr, SymbolKey.HAS_INSTANCE.toString(), 1);
+        } else {
+            return super.buildDataDescriptorHelper(instanceIdInfo, scope, value, attr);
+        }
+    }
+
+    @Override
+    ScriptableObject buildDataDescriptorHelper(
+            Symbol key, Scriptable scope, Object value, int attr) {
+        if (key == SymbolKey.HAS_INSTANCE) {
+            return buildDataDescriptor(scope, value, attr, key.toString(), 1);
+        } else {
+            return super.buildDataDescriptorHelper(key, scope, value, attr);
+        }
     }
 
     protected Object getPrototypeProperty() {

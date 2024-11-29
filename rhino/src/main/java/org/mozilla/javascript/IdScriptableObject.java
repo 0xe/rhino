@@ -936,6 +936,21 @@ public abstract class IdScriptableObject extends ScriptableObject implements IdF
         return desc;
     }
 
+    /**
+     * Overridden in the base class for different descriptors
+     *
+     * @return ScriptableObject
+     */
+    ScriptableObject buildDataDescriptorHelper(
+            Symbol key, Scriptable scope, Object value, int attr) {
+        return buildDataDescriptor(scope, value, attr);
+    }
+
+    ScriptableObject buildDataDescriptorHelper(
+            int instanceIdInfo, Scriptable scope, Object value, int attr) {
+        return buildDataDescriptor(scope, value, attr);
+    }
+
     private ScriptableObject getBuiltInDescriptor(String name) {
         Object value = null;
         int attr = EMPTY;
@@ -950,14 +965,14 @@ public abstract class IdScriptableObject extends ScriptableObject implements IdF
             int id = (info & 0xFFFF);
             value = getInstanceIdValue(id);
             attr = (info >>> 16);
-            return buildDataDescriptor(scope, value, attr);
+            return buildDataDescriptorHelper(info, scope, value, attr);
         }
         if (prototypeValues != null) {
             int id = prototypeValues.findId(name);
             if (id != 0) {
                 value = prototypeValues.get(id);
                 attr = prototypeValues.getAttributes(id);
-                return buildDataDescriptor(scope, value, attr);
+                return buildDataDescriptorHelper(info, scope, value, attr);
             }
         }
         return null;
@@ -977,7 +992,7 @@ public abstract class IdScriptableObject extends ScriptableObject implements IdF
             if (id != 0) {
                 value = prototypeValues.get(id);
                 attr = prototypeValues.getAttributes(id);
-                return buildDataDescriptor(scope, value, attr);
+                return buildDataDescriptorHelper(key, scope, value, attr);
             }
         }
         return null;

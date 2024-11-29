@@ -1,6 +1,7 @@
 package org.mozilla.javascript;
 
 import org.junit.Assert;
+import org.junit.Ignore;
 import org.junit.Test;
 import org.mozilla.javascript.tests.Utils;
 
@@ -66,6 +67,48 @@ public class SymbolHasInstanceTest {
                 });
     }
 
+    // See: https://tc39.es/ecma262/#sec-function.prototype-%symbol.hasinstance%
+    @Test
+    public void testFunctionPrototypeSymbolHasInstanceHasAttributesStrictMode() {
+        String script =
+                "'use strict';\n"
+                        + "var a = Object.getOwnPropertyDescriptor(Function.prototype, Symbol.hasInstance);\n"
+                        + "a.writable + ':' + a.configurable + ':' + a.enumerable";
+        Utils.runWithAllOptimizationLevels(
+                (cx) -> {
+                    cx.setLanguageVersion(Context.VERSION_ES6);
+                    final Scriptable scope = cx.initStandardObjects();
+                    Object result =
+                            cx.evaluateString(scope, script, "testSymbolHasInstance", 0, null);
+                    Assert.assertEquals("false:false:false", result);
+                    return null;
+                });
+    }
+
+    @Test
+    @Ignore("name-length-params-prototype-set-incorrectly")
+    public void testFunctionPrototypeSymbolHasInstanceHasProperties() {
+        String script =
+                "var a = Object.getOwnPropertyDescriptor(Function.prototype[Symbol.hasInstance], 'length');\n"
+                        + "a.value + ':' + a.writable + ':' + a.configurable + ':' + a.enumerable";
+
+        String script2 =
+                "var a = Object.getOwnPropertyDescriptor(Function.prototype[Symbol.hasInstance], 'name');\n"
+                        + "a.value + ':' + a.writable + ':' + a.configurable + ':' + a.enumerable";
+        Utils.runWithAllOptimizationLevels(
+                (cx) -> {
+                    cx.setLanguageVersion(Context.VERSION_ES6);
+                    final Scriptable scope = cx.initStandardObjects();
+                    Object result =
+                            cx.evaluateString(scope, script, "testSymbolHasInstance", 0, null);
+                    Object result2 =
+                            cx.evaluateString(scope, script2, "testSymbolHasInstance", 0, null);
+                    Assert.assertEquals("1:false:true:false", result);
+                    Assert.assertEquals("Symbol(Symbol.hasInstance):false:true:false", result2);
+                    return null;
+                });
+    }
+
     @Test
     public void testFunctionPrototypeSymbolHasInstance() {
         String script =
@@ -78,6 +121,62 @@ public class SymbolHasInstanceTest {
                     Object result =
                             cx.evaluateString(scope, script, "testSymbolHasInstance", 0, null);
                     Assert.assertEquals("true:true", result);
+                    return null;
+                });
+    }
+
+    @Test
+    @Ignore("wip")
+    public void testFunctionPrototypeSymbolHasInstanceOnObjectReturnsTrue() {
+        String script =
+                "var f = function() {};\n"
+                        + "var o = new f();\n"
+                        + "var o2 = Object.create(o);\n"
+                        + "(f[Symbol.hasInstance](o)) + ':' + "
+                        + "(f[Symbol.hasInstance](o2));\n";
+        Utils.runWithAllOptimizationLevels(
+                (cx) -> {
+                    cx.setLanguageVersion(Context.VERSION_ES6);
+                    final Scriptable scope = cx.initStandardObjects();
+                    Object result =
+                            cx.evaluateString(scope, script, "testSymbolHasInstance", 0, null);
+                    Assert.assertEquals("true:true", result);
+                    return null;
+                });
+    }
+
+    @Test
+    @Ignore("wip")
+    public void testFunctionPrototypeSymbolHasInstanceOnBoundTargetReturnsTrue() {
+        String script =
+                "var BC = function() {};\n"
+                        + "var bc = new BC();\n"
+                        + "var bound = BC.bind();\n"
+                        + "bound[Symbol.hasInstance](bc);\n";
+        Utils.runWithAllOptimizationLevels(
+                (cx) -> {
+                    cx.setLanguageVersion(Context.VERSION_ES6);
+                    final Scriptable scope = cx.initStandardObjects();
+                    Object result =
+                            cx.evaluateString(scope, script, "testSymbolHasInstance", 0, null);
+                    Assert.assertEquals("true", result);
+                    return null;
+                });
+    }
+
+    @Test
+    @Ignore("wip")
+    public void testFunctionPrototypeSymbolHasInstanceReturnsFalseOnUndefinedOrProtoypeNotFound() {
+        String script =
+                "Function.prototype[Symbol.hasInstance].call() + ':' +"
+                        + "Function.prototype[Symbol.hasInstance].call({});";
+        Utils.runWithAllOptimizationLevels(
+                (cx) -> {
+                    cx.setLanguageVersion(Context.VERSION_ES6);
+                    final Scriptable scope = cx.initStandardObjects();
+                    Object result =
+                            cx.evaluateString(scope, script, "testSymbolHasInstance", 0, null);
+                    Assert.assertEquals("false:false", result);
                     return null;
                 });
     }
