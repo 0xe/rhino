@@ -72,15 +72,16 @@ public class SymbolHasInstanceTest {
     public void testFunctionPrototypeSymbolHasInstanceHasAttributesStrictMode() {
         String script =
                 "'use strict';\n"
+                        + "var t = typeof Function.prototype[Symbol.hasInstance];\n"
                         + "var a = Object.getOwnPropertyDescriptor(Function.prototype, Symbol.hasInstance);\n"
-                        + "a.writable + ':' + a.configurable + ':' + a.enumerable";
+                        + "t + ':' + a.writable + ':' + a.configurable + ':' + a.enumerable";
         Utils.runWithAllOptimizationLevels(
                 (cx) -> {
                     cx.setLanguageVersion(Context.VERSION_ES6);
                     final Scriptable scope = cx.initStandardObjects();
                     Object result =
                             cx.evaluateString(scope, script, "testSymbolHasInstance", 0, null);
-                    Assert.assertEquals("false:false:false", result);
+                    Assert.assertEquals("function:false:false:false", result);
                     return null;
                 });
     }
@@ -126,7 +127,6 @@ public class SymbolHasInstanceTest {
     }
 
     @Test
-    @Ignore("wip")
     public void testFunctionPrototypeSymbolHasInstanceOnObjectReturnsTrue() {
         String script =
                 "var f = function() {};\n"
@@ -165,7 +165,27 @@ public class SymbolHasInstanceTest {
     }
 
     @Test
-    @Ignore("wip")
+    public void testFunctionInstanceNullVoidEtc() {
+        String script =
+                "var f = function() {};\n"
+                        + "var x;\n"
+                        + "a = (undefined instanceof f) + ':' +\n"
+                        + "(x instanceof f) + ':' +\n"
+                        + "(null instanceof f) + ':' +\n"
+                        + "(void 0 instanceof f)\n"
+                        + "a";
+        Utils.runWithAllOptimizationLevels(
+                (cx) -> {
+                    cx.setLanguageVersion(Context.VERSION_ES6);
+                    final Scriptable scope = cx.initStandardObjects();
+                    Object result =
+                            cx.evaluateString(scope, script, "testSymbolHasInstance", 0, null);
+                    Assert.assertEquals("false:false:false:false", result);
+                    return null;
+                });
+    }
+
+    @Test
     public void testFunctionPrototypeSymbolHasInstanceReturnsFalseOnUndefinedOrProtoypeNotFound() {
         String script =
                 "Function.prototype[Symbol.hasInstance].call() + ':' +"

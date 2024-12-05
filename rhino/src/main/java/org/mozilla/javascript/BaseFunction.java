@@ -338,16 +338,21 @@ public class BaseFunction extends IdScriptableObject implements Function {
                                         Scriptable scope,
                                         Scriptable thisObj,
                                         Object[] args) {
-                                    if (thisObj != null) {
+                                    if (thisObj != null
+                                            && args.length == 1
+                                            && args[0] instanceof Scriptable) {
+                                        Scriptable obj = (Scriptable) args[0];
                                         Object protoProp =
                                                 ScriptableObject.getProperty(thisObj, "prototype");
                                         if (protoProp instanceof IdScriptableObject) {
                                             return ScriptRuntime.jsDelegatesTo(
-                                                    thisObj, (Scriptable) protoProp);
+                                                    obj, (Scriptable) protoProp);
                                         }
+                                        throw ScriptRuntime.typeErrorById(
+                                                "msg.instanceof.bad.prototype", getFunctionName());
+                                    } else {
+                                        return false; // NOT_FOUND, null etc.
                                     }
-                                    throw ScriptRuntime.typeErrorById(
-                                            "msg.instanceof.bad.prototype", getFunctionName());
                                 }
                             });
         }
