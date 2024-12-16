@@ -84,7 +84,7 @@ public final class NativeJSON extends ScriptableObject {
         return stringify(cx, scope, value, replacer, space);
     }
 
-    private static Object parse(Context cx, Scriptable scope, String jtext) {
+    public static Object parse(Context cx, Scriptable scope, String jtext) {
         try {
             return new JsonParser(cx, scope).parseValue(jtext);
         } catch (JsonParser.ParseException ex) {
