@@ -282,9 +282,11 @@ public class JsonParser {
             readDigits();
         }
         // read optional fraction part
+        boolean doubleRead = false;
         if (pos < length) {
             c = src.charAt(pos);
             if (c == '.') {
+                doubleRead = true;
                 pos += 1;
                 c = nextOrNumberError(numberStart);
                 if (!(c >= '0' && c <= '9')) {
@@ -297,6 +299,7 @@ public class JsonParser {
         if (pos < length) {
             c = src.charAt(pos);
             if (c == 'e' || c == 'E') {
+                doubleRead = true;
                 pos += 1;
                 c = nextOrNumberError(numberStart);
                 if (c == '-' || c == '+') {
@@ -309,12 +312,21 @@ public class JsonParser {
             }
         }
         String num = src.substring(numberStart, pos);
-        final double dval = Double.parseDouble(num);
+
+        final double dval = doubleRead ? Double.parseDouble(num) : attemptParseAsInt(num);
         final int ival = (int) dval;
         if (ival == dval) {
             return Integer.valueOf(ival);
         }
         return Double.valueOf(dval);
+    }
+
+    private double attemptParseAsInt(String num) {
+        try {
+            return Integer.parseInt(num);
+        } catch (NumberFormatException e) {
+            return Double.parseDouble(num);
+        }
     }
 
     private ParseException numberError(int start, int end) {
