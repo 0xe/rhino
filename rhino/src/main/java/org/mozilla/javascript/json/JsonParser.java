@@ -8,10 +8,9 @@ package org.mozilla.javascript.json;
 
 import java.util.ArrayList;
 import java.util.List;
-import org.mozilla.javascript.Context;
-import org.mozilla.javascript.ScriptRuntime;
+
+import org.mozilla.javascript.*;
 import org.mozilla.javascript.ScriptRuntime.StringIdOrIndex;
-import org.mozilla.javascript.Scriptable;
 
 /**
  * This class converts a stream of JSON tokens into a JSON value.
@@ -23,8 +22,11 @@ import org.mozilla.javascript.Scriptable;
  */
 public class JsonParser {
 
-    private Context cx;
-    private Scriptable scope;
+    private final Context cx;
+    private final Scriptable scope;
+    private final Scriptable cacheObjectProtoype;
+    private final Scriptable cacheArrayProtoype;
+    private final Scriptable cacheTopLevelScope;
 
     private int pos;
     private int length;
@@ -33,6 +35,9 @@ public class JsonParser {
     public JsonParser(Context cx, Scriptable scope) {
         this.cx = cx;
         this.scope = scope;
+        this.cacheTopLevelScope = ScriptableObject.getTopLevelScope(scope);
+        this.cacheObjectProtoype = TopLevel.getBuiltinPrototype(cacheTopLevelScope, TopLevel.Builtins.Object);
+        this.cacheArrayProtoype = TopLevel.getBuiltinPrototype(cacheTopLevelScope, TopLevel.Builtins.Array);
     }
 
     public synchronized Object parseValue(String json) throws ParseException {
@@ -88,7 +93,9 @@ public class JsonParser {
 
     private Object readObject() throws ParseException {
         consumeWhitespace();
-        Scriptable object = cx.newObject(scope);
+        Scriptable object = new NativeObject();
+        setParentScopeAndPrototype(object, cacheObjectProtoype);
+
         // handle empty object literal case early
         if (pos < length && src.charAt(pos) == '}') {
             pos += 1;
@@ -140,7 +147,9 @@ public class JsonParser {
         // handle empty array literal case early
         if (pos < length && src.charAt(pos) == ']') {
             pos += 1;
-            return cx.newArray(scope, 0);
+            NativeArray result = new NativeArray(0);
+            setParentScopeAndPrototype(result, cacheArrayProtoype);
+            return result;
         }
         List<Object> list = new ArrayList<>();
         boolean needsComma = false;
@@ -152,7 +161,9 @@ public class JsonParser {
                         throw new ParseException("Unexpected comma in array literal");
                     }
                     pos += 1;
-                    return cx.newArray(scope, list.toArray());
+                    NativeArray result = new NativeArray(list.toArray());
+                    setParentScopeAndPrototype(result, cacheArrayProtoype);
+                    return result;
                 case ',':
                     if (!needsComma) {
                         throw new ParseException("Unexpected comma in array literal");
@@ -170,6 +181,11 @@ public class JsonParser {
             consumeWhitespace();
         }
         throw new ParseException("Unterminated array literal");
+    }
+
+    private void setParentScopeAndPrototype(Scriptable result, Scriptable prototype) {
+        result.setParentScope(this.cacheTopLevelScope);
+        result.setPrototype(prototype);
     }
 
     private String readString() throws ParseException {

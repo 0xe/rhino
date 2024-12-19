@@ -43,8 +43,23 @@ public class JsonBenchmark {
         System.out.println(state.script.length());
     }
 
+    @Test
+    public void testJson() throws IOException
+    {
+        JsonState state = new JsonState();
+        state.setup();
+
+        int i = 0;
+        long timeBeforeMs = System.currentTimeMillis();
+        while (i < 1000) {
+            NativeJSON.parse(state.cx, state.scope, state.script);
+            i += 1;
+        }
+        System.out.println(System.currentTimeMillis() - timeBeforeMs);
+    }
+
     @Benchmark
-    @OperationsPerInvocation(100)
+    @OperationsPerInvocation(250)
     public Object parseJSON(JsonState state) {
         return NativeJSON.parse(state.cx, state.scope, state.script);
     }
