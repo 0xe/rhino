@@ -2420,6 +2420,13 @@ public final class Interpreter extends Icode implements Evaluator {
                                     ids[i] = key;
                                     continue Loop;
                                 }
+                            case Icode_NEWOBJECT:
+                            {
+                                // create empty object
+                                ++stackTop;
+                                stack[stackTop] = cx.newObject(frame.scope);
+                                continue Loop;
+                            }
                             case Token.OBJECTLIT:
                                 {
                                     Object[] values = (Object[]) stack[stackTop];
