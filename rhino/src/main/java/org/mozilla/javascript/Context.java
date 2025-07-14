@@ -384,6 +384,14 @@ public class Context implements Closeable {
      */
     public static final int FEATURE_INTL_402 = 22;
 
+    /**
+     * Use FastEmbeddedSlotMap instead of the default EmbeddedSlotMap for better performance. This
+     * is an experimental feature and may be removed or changed in future versions.
+     *
+     * @since 1.7.15
+     */
+    public static final int FEATURE_FAST_EMBEDDED_SLOT_MAP = 23;
+
     public static final String languageVersionProperty = "language version";
     public static final String errorReporterProperty = "error reporter";
 

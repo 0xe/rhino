@@ -209,6 +209,9 @@ public class ContextFactory {
     protected boolean hasFeature(Context cx, int featureIndex) {
         int version;
         switch (featureIndex) {
+            case Context.FEATURE_FAST_EMBEDDED_SLOT_MAP:
+                // Default to false for compatibility
+                return false;
             case Context.FEATURE_NON_ECMA_GET_YEAR:
                 /*
                  * During the great date rewrite of 1.3, we tried to track the

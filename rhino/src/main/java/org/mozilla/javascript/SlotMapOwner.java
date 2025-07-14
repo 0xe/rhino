@@ -274,9 +274,14 @@ public abstract class SlotMapOwner {
 
     protected static SlotMap createSlotMap(int initialSize) {
         Context cx = Context.getCurrentContext();
+        boolean useFastMap = (cx != null) && cx.hasFeature(Context.FEATURE_FAST_EMBEDDED_SLOT_MAP);
+
         if ((cx != null) && cx.hasFeature(Context.FEATURE_THREAD_SAFE_OBJECTS)) {
             if (initialSize == 0) {
                 return THREAD_SAFE_EMPTY_SLOT_MAP;
+            } else if (useFastMap) {
+                // Use FastEmbeddedSlotMap with thread safety wrapper when feature is enabled
+                return new ThreadSafeSlotMapWrapper(new FastEmbeddedSlotMap(initialSize));
             } else if (initialSize > LARGE_HASH_SIZE) {
                 return new ThreadSafeHashSlotMap(initialSize);
             } else {
@@ -286,6 +291,8 @@ public abstract class SlotMapOwner {
             return EMPTY_SLOT_MAP;
         } else if (initialSize > LARGE_HASH_SIZE) {
             return new HashSlotMap();
+        } else if (useFastMap) {
+            return new FastEmbeddedSlotMap(initialSize);
         } else {
             return new EmbeddedSlotMap();
         }
