@@ -14,6 +14,25 @@ final class InterpretedFunction extends NativeFunction implements Script {
     InterpreterData idata;
     SecurityController securityController;
     Object securityDomain;
+    
+    // Counter for function invocations
+    int invocationCount = 0;
+    
+    // Whether this function has been compiled to bytecode
+    volatile boolean isCompiled = false;
+    
+    // Package-private getters for testing
+    int getInvocationCount() {
+        return invocationCount;
+    }
+    
+    boolean isCompiled() {
+        return isCompiled;
+    }
+    
+    boolean shouldCompile() {
+        return isCompiled || (invocationCount >= Context.getCurrentContext().getFunctionCompilationThreshold());
+    }
 
     private InterpretedFunction(InterpreterData idata, Object staticSecurityDomain) {
         this.idata = idata;
