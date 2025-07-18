@@ -94,6 +94,12 @@ public class FunctionTest {
     }
 
     @Test
+    public void functionReferItself() throws Exception {
+        final String script = "var x = function g() { return g.toString() }; x();";
+        Utils.assertWithAllModes("function g() { return g.toString() }", script);
+    }
+
+    @Test
     public void functioNamesExceptionsStrict() throws Exception {
         final String script =
                 ""

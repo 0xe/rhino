@@ -17,6 +17,8 @@ import org.mozilla.javascript.ast.AstRoot;
 import org.mozilla.javascript.ast.Block;
 import org.mozilla.javascript.ast.FunctionNode;
 import org.mozilla.javascript.ast.Jump;
+import org.mozilla.javascript.ast.Name;
+import org.mozilla.javascript.ast.PropertyGet;
 import org.mozilla.javascript.ast.Scope;
 import org.mozilla.javascript.ast.ScriptNode;
 import org.mozilla.javascript.ast.TemplateCharacters;
@@ -114,6 +116,11 @@ class CodeGenerator extends Icode {
         }
         if (theFunction.isInStrictMode()) {
             itsData.isStrict = true;
+            // Strict mode functions have different semantics that may not be preserved during
+            // compilation
+            // Disable compilation to ensure correct behavior (ReferenceError for undeclared vars,
+            // etc.)
+            itsData.usesConstructionsThatCantBeCompiledInChunk = true;
         }
         if (theFunction.isES6Generator()) {
             itsData.isES6Generator = true;
@@ -268,6 +275,153 @@ class CodeGenerator extends Icode {
         }
     }
 
+    /**
+     * Checks if a function node contains a reference to the given name within its body. This is
+     * used to detect named function expressions that reference themselves.
+     */
+    private boolean hasSelfReference(FunctionNode fn, String functionName) {
+        // Get the function body
+        AstNode body = fn.getBody();
+        if (body != null) {
+            return containsNameReference(body, functionName);
+        }
+        return false;
+    }
+
+    /** Recursively checks if an AST node or its children contain a reference to the given name. */
+    private boolean containsNameReference(AstNode node, String name) {
+        if (node == null) return false;
+
+        // Check if this node is a name reference to our function
+        if (node instanceof Name) {
+            Name nameNode = (Name) node;
+            if (name.equals(nameNode.getIdentifier())) {
+                return true;
+            }
+        }
+
+        // Also check for PropertyGet nodes where the target is our function name
+        // This catches cases like "functionName.toString()"
+        if (node instanceof PropertyGet) {
+            PropertyGet propGet = (PropertyGet) node;
+            AstNode target = propGet.getTarget();
+            if (target instanceof Name) {
+                Name nameNode = (Name) target;
+                if (name.equals(nameNode.getIdentifier())) {
+                    return true;
+                }
+            }
+        }
+
+        // Recursively check all children - AstNode has different iteration
+        for (Node child = node.getFirstChild(); child != null; child = child.getNext()) {
+            if (child instanceof AstNode && containsNameReference((AstNode) child, name)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private void checkForUnsupportedConstructs(int type, Node node) {
+        // Check for constructs that can't be compiled in chunk compilation
+        switch (type) {
+            case Token.FINALLY:
+            case Token.TRY:
+            case Token.YIELD:
+            case Token.YIELD_STAR:
+                itsData.usesConstructionsThatCantBeCompiledInChunk = true;
+                break;
+
+            // Strict mode constructs that might behave differently when compiled
+            case Token.ASSIGN:
+            case Token.ASSIGN_ADD:
+            case Token.ASSIGN_SUB:
+            case Token.ASSIGN_MUL:
+            case Token.ASSIGN_DIV:
+            case Token.ASSIGN_MOD:
+            case Token.ASSIGN_BITOR:
+            case Token.ASSIGN_BITXOR:
+            case Token.ASSIGN_BITAND:
+            case Token.ASSIGN_LSH:
+            case Token.ASSIGN_RSH:
+            case Token.ASSIGN_URSH:
+                // In strict mode, assignments can have different semantics (ReferenceError for
+                // undeclared vars)
+                // Compilation might change this behavior, so disable compilation for strict mode
+                // functions
+                if (itsInFunctionFlag && itsData.isStrict) {
+                    itsData.usesConstructionsThatCantBeCompiledInChunk = true;
+                }
+                break;
+
+            // Arrow functions might have 'this' binding issues during compilation
+            case Token.ARROW:
+                itsData.usesConstructionsThatCantBeCompiledInChunk = true;
+                break;
+
+            // Template literals have caching issues with JIT compilation
+            case Token.TAGGED_TEMPLATE_LITERAL:
+            case Token.TEMPLATE_LITERAL:
+                itsData.usesConstructionsThatCantBeCompiledInChunk = true;
+                break;
+
+            case Token.FUNCTION:
+                // Check if this is a named function expression that references itself
+                if (node != null) {
+                    int fnIndex = node.getExistingIntProp(Node.FUNCTION_PROP);
+                    FunctionNode fn = scriptOrFn.getFunctionNode(fnIndex);
+                    if (fn.getFunctionType() == FunctionNode.FUNCTION_EXPRESSION
+                            && fn.getName() != null
+                            && !fn.getName().isEmpty()) {
+                        // If it has self-references, definitely don't compile
+                        if (hasSelfReference(fn, fn.getName())) {
+                            itsData.usesConstructionsThatCantBeCompiledInChunk = true;
+                        }
+                        // Additionally, if it's in strict mode, be conservative
+                        else if (itsData.isStrict) {
+                            itsData.usesConstructionsThatCantBeCompiledInChunk = true;
+                        }
+                    }
+                }
+                break;
+
+            case Token.NEW:
+                // Check if this is new Continuation() or new Promise()
+                if (node != null) {
+                    Node child = node.getFirstChild();
+                    if (child != null && child.getType() == Token.NAME) {
+                        String name = child.getString();
+                        if ("Continuation".equals(name) || "Promise".equals(name)) {
+                            itsData.usesConstructionsThatCantBeCompiledInChunk = true;
+                        }
+                    }
+                }
+                break;
+
+            case Token.CALL:
+                // Check for getContinuation() or resumeContinuation() calls
+                if (node != null) {
+                    Node child = node.getFirstChild();
+                    if (child != null && child.getType() == Token.NAME) {
+                        String name = child.getString();
+                        if ("getContinuation".equals(name) || "resumeContinuation".equals(name)) {
+                            itsData.usesConstructionsThatCantBeCompiledInChunk = true;
+                        }
+                    }
+                }
+                break;
+        }
+
+        // For generators, check if the function itself is a generator
+        if (scriptOrFn instanceof FunctionNode) {
+            FunctionNode fn = (FunctionNode) scriptOrFn;
+            if (fn.isGenerator() || fn.isES6Generator()) {
+                itsData.usesConstructionsThatCantBeCompiledInChunk = true;
+            }
+        }
+    }
+
     private static RuntimeException badTree(Node node) {
         throw new RuntimeException(node.toString());
     }
@@ -275,6 +429,12 @@ class CodeGenerator extends Icode {
     private void visitStatement(Node node, int initialStackDepth) {
         int type = node.getType();
         Node child = node.getFirstChild();
+
+        // Check for constructs that can't be compiled in chunk compilation
+        if (!itsData.usesConstructionsThatCantBeCompiledInChunk) {
+            checkForUnsupportedConstructs(type, node);
+        }
+
         switch (type) {
             case Token.FUNCTION:
                 {
@@ -556,6 +716,12 @@ class CodeGenerator extends Icode {
         int type = node.getType();
         Node child = node.getFirstChild();
         int savedStackDepth = stackDepth;
+
+        // Check for constructs that can't be compiled in chunk compilation
+        if (!itsData.usesConstructionsThatCantBeCompiledInChunk) {
+            checkForUnsupportedConstructs(type, node);
+        }
+
         switch (type) {
             case Token.FUNCTION:
                 {
@@ -1849,6 +2015,14 @@ class CodeGenerator extends Icode {
     private void releaseLocal(int localSlot) {
         --localTop;
         if (localSlot != localTop) Kit.codeBug();
+    }
+
+    /** Get the name of the current function being processed, or null if not in a function */
+    private String getCurrentFunctionName() {
+        if (scriptOrFn instanceof FunctionNode) {
+            return ((FunctionNode) scriptOrFn).getName();
+        }
+        return null;
     }
 
     private static final class CompleteOptionalCallJump {

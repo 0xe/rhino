@@ -15,6 +15,51 @@ final class InterpretedFunction extends NativeFunction implements Script {
     SecurityController securityController;
     Object securityDomain;
 
+    // Counter for function invocations
+    int invocationCount = 0;
+
+    // Whether this function has been compiled to bytecode
+    volatile boolean isCompiled = false;
+
+    // Whether compilation has been attempted for this function
+    volatile boolean compilationAttempted = false;
+
+    // The compiled version of this function (if available)
+    private volatile Callable compiledFunction = null;
+
+    // Package-private getters for testing
+    int getInvocationCount() {
+        return invocationCount;
+    }
+
+    boolean isCompiled() {
+        return isCompiled;
+    }
+
+    // TODO: should be more robust
+    boolean shouldCompile(Context cx) {
+        return !compilationAttempted
+                && cx.hasFunctionCompiler()
+                && !usesConstructionsThatCantBeCompiledInChunk()
+                && (invocationCount
+                        >= Context.getCurrentContext().getFunctionCompilationThreshold());
+    }
+
+    boolean usesConstructionsThatCantBeCompiledInChunk() {
+        return idata.usesConstructionsThatCantBeCompiledInChunk;
+    }
+
+    // set compiled version
+    void setCompiledFunction(Callable compiledFunction) {
+        this.compiledFunction = compiledFunction;
+        this.compilationAttempted = true;
+        this.isCompiled = true;
+    }
+
+    void markCompilationAttempted() {
+        this.compilationAttempted = true;
+    }
+
     private InterpretedFunction(InterpreterData idata, Object staticSecurityDomain) {
         this.idata = idata;
 
@@ -81,6 +126,14 @@ final class InterpretedFunction extends NativeFunction implements Script {
      */
     @Override
     public Object call(Context cx, Scriptable scope, Scriptable thisObj, Object[] args) {
+        // use compiled version if available, but only if we're not in a continuation context
+        // (continuations require interpreted execution to maintain interpreter state as
+        // continuation state is stored differently between the implementations..)
+        if (compiledFunction != null && !cx.isContinuationsTopCall) {
+            Object result = compiledFunction.call(cx, scope, thisObj, args);
+            return result;
+        }
+
         if (!ScriptRuntime.hasTopCall(cx)) {
             return ScriptRuntime.doTopCall(this, cx, scope, thisObj, args, isStrict());
         }

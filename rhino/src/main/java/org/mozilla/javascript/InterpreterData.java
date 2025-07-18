@@ -94,6 +94,9 @@ final class InterpreterData implements Serializable, DebuggableScript {
 
     boolean evalScriptFlag; // true if script corresponds to eval() code
 
+    // true if the function uses constructs that can't be compiled in chunk compilation
+    boolean usesConstructionsThatCantBeCompiledInChunk = false;
+
     private int icodeHashCode = 0;
 
     /** true if the function has been declared like "!function() {}". */

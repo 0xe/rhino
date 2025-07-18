@@ -109,6 +109,15 @@ public class ClassCompiler {
      */
     public Object[] compileToClassFiles(
             String source, String sourceLocation, int lineno, String mainClassName) {
+        return compileToClassFiles(source, sourceLocation, lineno, mainClassName, false);
+    }
+
+    public Object[] compileToClassFiles(
+            String source,
+            String sourceLocation,
+            int lineno,
+            String mainClassName,
+            boolean returnFunction) {
         Parser p = new Parser(compilerEnv);
         AstRoot ast = p.parse(source, sourceLocation, lineno);
         IRFactory irf = new IRFactory(compilerEnv, source);
@@ -137,7 +146,8 @@ public class ClassCompiler {
         Codegen codegen = new Codegen();
         codegen.setMainMethodClass(mainMethodClassName);
         byte[] scriptClassBytes =
-                codegen.compileToClassFile(compilerEnv, scriptClassName, tree, source, false);
+                codegen.compileToClassFile(
+                        compilerEnv, scriptClassName, tree, source, returnFunction);
 
         if (isPrimary) {
             return new Object[] {scriptClassName, scriptClassBytes};
