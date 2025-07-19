@@ -385,9 +385,7 @@ public class Context implements Closeable {
      */
     public static final int FEATURE_INTL_402 = 22;
 
-    /**
-     * Feature to enable on-demand function compilation
-     */
+    /** Feature to enable on-demand function compilation */
     public static final int FEATURE_FUNCTION_COMPILATION = 23;
 
     public static final String languageVersionProperty = "language version";
@@ -2469,22 +2467,27 @@ public class Context implements Closeable {
     }
 
     FunctionCompiler functionCompiler = null;
-    /**
-     * Interface for compiling interpreted functions to optimized bytecode.
-     */
+
+    /** Interface for compiling interpreted functions to optimized bytecode. */
     public interface FunctionCompiler {
         /**
          * Compile an interpreted function to optimized bytecode.
-         * 
+         *
          * @param ifun The interpreted function to compile
          * @return A callable that executes the compiled function, or null if compilation failed
          */
-        Callable compile(InterpretedFunction ifun);
+        Callable compile(
+                InterpretedFunction ifun,
+                Context cx,
+                Scriptable scope,
+                Scriptable thisObj,
+                Object[] args);
     }
 
     /**
-     * Sets the function compiler that will be used to compile interpreted functions to optimized bytecode.
-     * 
+     * Sets the function compiler that will be used to compile interpreted functions to optimized
+     * bytecode.
+     *
      * @param compiler The function compiler to use, or null to disable function compilation
      */
     public void setFunctionCompiler(FunctionCompiler compiler) {
@@ -2494,7 +2497,7 @@ public class Context implements Closeable {
 
     /**
      * Returns the current function compiler, or null if none is set.
-     * 
+     *
      * @return The current function compiler, or null
      */
     public FunctionCompiler getFunctionCompiler() {
@@ -2503,26 +2506,28 @@ public class Context implements Closeable {
 
     /**
      * Checks if a function compiler is set.
-     * 
+     *
      * @return true if a function compiler is set, false otherwise
      */
     public boolean hasFunctionCompiler() {
         return functionCompiler != null;
     }
-    
+
     // Function compilation threshold
     private int functionCompilationThreshold = 5; // Default threshold
-    
+
     /**
      * Gets the invocation threshold after which functions will be considered for compilation.
+     *
      * @return the current compilation threshold
      */
     public int getFunctionCompilationThreshold() {
         return functionCompilationThreshold;
     }
-    
+
     /**
      * Sets the invocation threshold after which functions will be considered for compilation.
+     *
      * @param threshold the new compilation threshold (must be >= 0)
      * @throws IllegalArgumentException if threshold is negative
      */

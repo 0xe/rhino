@@ -3398,22 +3398,31 @@ public final class Interpreter extends Icode implements Evaluator {
                         Context.FunctionCompiler compiler = cx.getFunctionCompiler();
                         if (compiler != null) {
                             // Try to compile the function
-                            Callable compiledFunction = compiler.compile(ifun);
+                            Callable compiledFunction =
+                                    compiler.compile(
+                                            ifun,
+                                            cx,
+                                            calleeScope,
+                                            funThisObj,
+                                            getArgsArray(stack, sDbl, stackTop + 1, indexReg));
                             if (compiledFunction != null) {
                                 // Mark as compiled before replacing the function
                                 ifun.isCompiled = true;
                                 // Replace the function with the compiled version
                                 fun = compiledFunction;
+                                ifun.getParentScope()
+                                        .put(ifun.getFunctionName(), ifun.getParentScope(), fun);
                                 // Proceed to call the compiled function
                                 stack[stackTop] = fun;
                                 cx.lastInterpreterFrame = frame;
                                 frame.savedCallOp = op;
                                 frame.savedStackTop = stackTop;
-                                stack[stackTop] = fun.call(
-                                        cx,
-                                        calleeScope,
-                                        funThisObj,
-                                        getArgsArray(stack, sDbl, stackTop + 1, indexReg));
+                                stack[stackTop] =
+                                        fun.call(
+                                                cx,
+                                                calleeScope,
+                                                funThisObj,
+                                                getArgsArray(stack, sDbl, stackTop + 1, indexReg));
                                 return new ContinueLoop(frame, stackTop, indexReg);
                             }
                             // If compilation fails, the function will remain uncompiled
