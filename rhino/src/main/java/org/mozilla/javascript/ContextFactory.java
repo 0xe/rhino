@@ -292,7 +292,7 @@ public class ContextFactory {
                 return false;
 
             case Context.FEATURE_FUNCTION_COMPILATION:
-                return true;
+                return cx.hasFunctionCompiler();
         }
         // It is a bug to call the method with unknown featureIndex
         throw new IllegalArgumentException(String.valueOf(featureIndex));

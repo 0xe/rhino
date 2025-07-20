@@ -2466,7 +2466,8 @@ public class Context implements Closeable {
         applicationClassLoader = loader;
     }
 
-    FunctionCompiler functionCompiler = null;
+    //    FunctionCompiler functionCompiler = null;
+    FunctionCompiler functionCompiler = new IFnToClassCompiler();
 
     /** Interface for compiling interpreted functions to optimized bytecode. */
     public interface FunctionCompiler {

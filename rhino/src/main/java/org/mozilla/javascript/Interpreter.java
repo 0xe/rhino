@@ -3410,6 +3410,7 @@ public final class Interpreter extends Icode implements Evaluator {
                                 ifun.isCompiled = true;
                                 // Replace the function with the compiled version
                                 fun = compiledFunction;
+                                ((NativeFunction) fun).setParentScope(ifun.getParentScope());
                                 ifun.getParentScope()
                                         .put(ifun.getFunctionName(), ifun.getParentScope(), fun);
                                 // Proceed to call the compiled function
