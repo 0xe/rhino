@@ -21,6 +21,9 @@ final class InterpretedFunction extends NativeFunction implements Script {
     // Whether this function has been compiled to bytecode
     volatile boolean isCompiled = false;
 
+    // Whether compilation has been attempted for this function
+    volatile boolean compilationAttempted = false;
+
     // The compiled version of this function (if available)
     private volatile Callable compiledFunction = null;
 
@@ -33,16 +36,35 @@ final class InterpretedFunction extends NativeFunction implements Script {
         return isCompiled;
     }
 
+    // TODO: should be more robust
     boolean shouldCompile() {
-        return !isCompiled
+        return !compilationAttempted
+                && !usesContinuations() // Don't compile functions that use continuations
                 && (invocationCount
                         >= Context.getCurrentContext().getFunctionCompilationThreshold());
+    }
+
+    // TODO: bad hack!
+    boolean usesContinuations() {
+        if (idata.itsSourceFile != null && getRawSource() != null) {
+            String source = getRawSource();
+            // Check for continuation-related patterns
+            return source.contains("Continuation")
+                    || source.contains("getContinuation")
+                    || source.contains("resumeContinuation");
+        }
+        return false;
     }
 
     // set compiled version
     void setCompiledFunction(Callable compiledFunction) {
         this.compiledFunction = compiledFunction;
+        this.compilationAttempted = true;
         this.isCompiled = true;
+    }
+
+    void markCompilationAttempted() {
+        this.compilationAttempted = true;
     }
 
     private InterpretedFunction(InterpreterData idata, Object staticSecurityDomain) {
@@ -112,8 +134,8 @@ final class InterpretedFunction extends NativeFunction implements Script {
     @Override
     public Object call(Context cx, Scriptable scope, Scriptable thisObj, Object[] args) {
         // use compiled version if available, but only if we're not in a continuation context
-        // (continuations require interpreted execution to maintain interpreter state as continuation
-        // state is stored differently between the interpreter and the compiler.. :-/)
+        // (continuations require interpreted execution to maintain interpreter state as
+        // continuation state is stored differently between the implementations..)
         if (compiledFunction != null && !cx.isContinuationsTopCall) {
             return compiledFunction.call(cx, scope, thisObj, args);
         }

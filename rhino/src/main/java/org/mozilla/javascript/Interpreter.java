@@ -3431,17 +3431,15 @@ public final class Interpreter extends Icode implements Evaluator {
                                     return new ContinueLoop(frame, stackTop, indexReg);
                                 }
                             } catch (Exception e) {
-                                // TODO: should have a marker for "attempted compilation"
-                                // Compilation failed, continue with interpretation
-                                ifun.isCompiled = true;
+                                // failed, mark as attempted so we don't try again
+                                ifun.markCompilationAttempted();
+                                // TODO: should log why we failed
+                                // TODO: should we attempt a few times and "give up"?
                                 // rethrow continuation pending if we have one
                                 if (e instanceof ContinuationPending) {
                                     throw e;
                                 }
                             }
-                            // If compilation fails, the function will remain uncompiled
-                            // and we'll try again on the next invocation
-                            // TODO: should we attempt a few times and "give up"?
                         }
                     }
                 }

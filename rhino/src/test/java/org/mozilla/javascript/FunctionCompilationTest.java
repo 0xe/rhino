@@ -132,6 +132,38 @@ public class FunctionCompilationTest {
     }
 
     @Test
+    public void testFunctionWithContinuationDoesNotCompile() throws Exception {
+        withContext(
+                (cx, scope) -> {
+                    String script =
+                            "function testContinuation() {\n"
+                                    + "    var c = getContinuation();\n"
+                                    + "    return 'test';\n"
+                                    + "}\n"
+                                    + "function getContinuation() { return new Continuation(); }\n"
+                                    + "for (var i = 0; i < 10; i++) {\n"
+                                    + "    try { testContinuation(); } catch(e) {}\n"
+                                    + "}\n";
+
+                    cx.setFunctionCompiler(new IFnToClassCompiler());
+
+                    try {
+                        cx.evaluateString(scope, script, "test", 1, null);
+                    } catch (Exception e) {
+                    }
+
+                    Object testFn = ScriptableObject.getProperty(scope, "testContinuation");
+                    assertTrue(
+                            "testContinuation should be a function",
+                            testFn instanceof InterpretedFunction);
+
+                    InterpretedFunction ifun = (InterpretedFunction) testFn;
+                    assertFalse(
+                            "Function with continuation should not be compiled", ifun.isCompiled());
+                });
+    }
+
+    @Test
     public void testCompilationThreshold() throws Exception {
         withContext(
                 (cx, scope) -> {
