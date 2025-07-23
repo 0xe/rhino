@@ -7,7 +7,6 @@ package org.mozilla.javascript;
 
 import static org.junit.Assert.*;
 
-import org.junit.Before;
 import org.junit.Test;
 
 public class FunctionCompilationTest {
@@ -32,20 +31,8 @@ public class FunctionCompilationTest {
 
     private static final TestContextFactory factory = new TestContextFactory();
 
-    @Before
-    public void setUp() {
-        // Ensure the factory is set before any tests run
-        if (ContextFactory.getGlobal() != factory) {
-            ContextFactory.initGlobal(factory);
-        }
-    }
-
-    private Context createContext() {
-        return factory.enterContext();
-    }
-
     private void withContext(TestWithContext test) throws Exception {
-        Context cx = createContext();
+        Context cx = factory.enterContext();
         try {
             ScriptableObject scope = cx.initStandardObjects();
             test.run(cx, scope);
