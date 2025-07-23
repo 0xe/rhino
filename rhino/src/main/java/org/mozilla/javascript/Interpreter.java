@@ -3395,7 +3395,7 @@ public final class Interpreter extends Icode implements Evaluator {
                 // state between the interpreter and the compiler)
                 if (cx.hasFeature(Context.FEATURE_FUNCTION_COMPILATION)
                         && !cx.isContinuationsTopCall
-                        && ifun.shouldCompile()) {
+                        && ifun.shouldCompile(cx)) {
                     // Try to compile the function
                     if (!ifun.isCompiled()) {
 
