@@ -45,14 +45,31 @@ final class InterpretedFunction extends NativeFunction implements Script {
                         >= Context.getCurrentContext().getFunctionCompilationThreshold());
     }
 
-    // TODO: bad hack!
+    // TODO: bad hack; needs proper fix!
     boolean usesContinuations() {
         if (idata.itsSourceFile != null && getRawSource() != null) {
             String source = getRawSource();
-            // Check for continuation-related patterns
+            // Check for continuation-related patterns, promise-creation patterns, and
+            // generator/iterator patterns
+            // This needs to be done during parsing and the Ifn should be marked correctly.. but
+            // that requires
+            // actual work. Good enough for a dirty prototype...
             return source.contains("Continuation")
                     || source.contains("getContinuation")
-                    || source.contains("resumeContinuation");
+                    || source.contains("resumeContinuation")
+                    || source.contains("new Promise")
+                    || (source.contains("promise")
+                            && source.contains("resolve")
+                            && source.contains("reject"))
+                    || source.contains("new constructor")
+                    || source.contains("yield")
+                    || source.contains("function*")
+                    || source.contains("function *")
+                    || source.contains("next()")
+                    || source.contains(".done")
+                    || source.contains(".value")
+                    || source.contains("Symbol.iterator")
+                    || source.contains("[Symbol.iterator]");
         }
         return false;
     }

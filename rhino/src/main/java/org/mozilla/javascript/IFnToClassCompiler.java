@@ -64,6 +64,9 @@ public class IFnToClassCompiler implements Context.FunctionCompiler {
             // Log the error and fall back to interpretation
             Context.reportError("Error compiling function: " + e);
             return null;
+        } catch (VerifyError err) {
+            Context.reportError("Error compiling function: " + err);
+            return null;
         }
     }
 }
