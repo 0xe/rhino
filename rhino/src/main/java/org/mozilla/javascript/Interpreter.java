@@ -3391,40 +3391,53 @@ public final class Interpreter extends Icode implements Evaluator {
                 ifun.invocationCount++;
 
                 // Check if function compilation is enabled and if this function should be compiled
-                if (cx.hasFeature(Context.FEATURE_FUNCTION_COMPILATION) && ifun.shouldCompile()) {
-                    // Only try to compile once per function
-                    synchronized (ifun) {
+                // Skip compilation only during continuation contexts (continuations have different
+                // state between the interpreter and the compiler)
+                if (cx.hasFeature(Context.FEATURE_FUNCTION_COMPILATION)
+                        && !cx.isContinuationsTopCall
+                        && ifun.shouldCompile()) {
+                    // Try to compile the function
+                    if (!ifun.isCompiled()) {
+
                         // Get the function compiler
                         Context.FunctionCompiler compiler = cx.getFunctionCompiler();
                         if (compiler != null) {
-                            // Try to compile the function
-                            Callable compiledFunction =
-                                    compiler.compile(
-                                            ifun,
-                                            cx,
-                                            calleeScope,
-                                            funThisObj,
-                                            getArgsArray(stack, sDbl, stackTop + 1, indexReg));
-                            if (compiledFunction != null) {
-                                // Mark as compiled before replacing the function
-                                ifun.isCompiled = true;
-                                // Replace the function with the compiled version
-                                fun = compiledFunction;
-                                ((NativeFunction) fun).setParentScope(ifun.getParentScope());
-                                ifun.getParentScope()
-                                        .put(ifun.getFunctionName(), ifun.getParentScope(), fun);
-                                // Proceed to call the compiled function
-                                stack[stackTop] = fun;
-                                cx.lastInterpreterFrame = frame;
-                                frame.savedCallOp = op;
-                                frame.savedStackTop = stackTop;
-                                stack[stackTop] =
-                                        fun.call(
+                            try {
+                                // Try to compile the function
+                                Callable compiledFunction =
+                                        compiler.compile(
+                                                ifun,
                                                 cx,
                                                 calleeScope,
                                                 funThisObj,
                                                 getArgsArray(stack, sDbl, stackTop + 1, indexReg));
-                                return new ContinueLoop(frame, stackTop, indexReg);
+                                if (compiledFunction != null) {
+                                    // Store the compiled function in the InterpretedFunction
+                                    // This will cause future calls to be delegated to the compiled
+                                    // version
+                                    ifun.setCompiledFunction(compiledFunction);
+
+                                    // Also use the compiled function for this current call
+                                    cx.lastInterpreterFrame = frame;
+                                    frame.savedCallOp = op;
+                                    frame.savedStackTop = stackTop;
+                                    stack[stackTop] =
+                                            compiledFunction.call(
+                                                    cx,
+                                                    calleeScope,
+                                                    funThisObj,
+                                                    getArgsArray(
+                                                            stack, sDbl, stackTop + 1, indexReg));
+                                    return new ContinueLoop(frame, stackTop, indexReg);
+                                }
+                            } catch (Exception e) {
+                                // TODO: should have a marker for "attempted compilation"
+                                // Compilation failed, continue with interpretation
+                                ifun.isCompiled = true;
+                                // rethrow continuation pending if we have one
+                                if (e instanceof ContinuationPending) {
+                                    throw e;
+                                }
                             }
                             // If compilation fails, the function will remain uncompiled
                             // and we'll try again on the next invocation

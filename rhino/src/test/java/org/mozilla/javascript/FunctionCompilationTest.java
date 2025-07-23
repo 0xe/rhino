@@ -23,7 +23,7 @@ public class FunctionCompilationTest {
 
         @Override
         protected void onContextCreated(Context cx) {
-            cx.setOptimizationLevel(-1); // Disable optimizations for testing
+            cx.setInterpretedMode(true);
             cx.setLanguageVersion(Context.VERSION_ES6);
             cx.setFunctionCompilationThreshold(5); // Set a low threshold for testing
             super.onContextCreated(cx);
@@ -121,15 +121,13 @@ public class FunctionCompilationTest {
                     assertEquals("test", foo);
 
                     // Get the function object to check its state
-                    // TODO: This doesn't work because scope still has the interpreted function
                     Object testFn = ScriptableObject.getProperty(scope, "test");
                     assertTrue("test should be a function", testFn instanceof Function);
                     assertTrue(
-                            "test should be a compiled function",
-                            ((NativeFunction) testFn)
-                                    .getClass()
-                                    .getCanonicalName()
-                                    .contains("CompiledFunction"));
+                            "test should be an InterpretedFunction",
+                            testFn instanceof InterpretedFunction);
+                    InterpretedFunction ifun = (InterpretedFunction) testFn;
+                    assertTrue("Function should be marked as compiled", ifun.isCompiled());
                 });
     }
 
@@ -185,8 +183,10 @@ public class FunctionCompilationTest {
                     Object testFn = ScriptableObject.getProperty(scope, "test");
                     assertTrue("test should be a function", testFn instanceof Function);
                     assertTrue(
-                            "test should be a compiled function",
-                            testFn.getClass().getName().contains("FunctionCompilationTest"));
+                            "test should be an InterpretedFunction",
+                            testFn instanceof InterpretedFunction);
+                    InterpretedFunction ifun = (InterpretedFunction) testFn;
+                    assertTrue("Function should be marked as compiled", ifun.isCompiled());
                 });
     }
 
