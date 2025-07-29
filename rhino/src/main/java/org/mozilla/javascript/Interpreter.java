@@ -3443,6 +3443,19 @@ public final class Interpreter extends Icode implements Evaluator {
                         }
                     }
                 }
+                if (ifun.isCompiled()) {
+                    cx.lastInterpreterFrame = frame;
+                    frame.savedCallOp = op;
+                    frame.savedStackTop = stackTop;
+                    stack[stackTop] = ifun.call(
+                            cx,
+                            calleeScope,
+                            funThisObj,
+                            getArgsArray(
+                                    stack, sDbl, stackTop + 1, indexReg));
+                    return new ContinueLoop(frame, stackTop, indexReg);
+                }
+
                 CallFrame callParentFrame = frame;
                 if (op == Icode_TAIL_CALL) {
                     // In principle tail call can re-use the current
