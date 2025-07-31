@@ -23,7 +23,7 @@ public class IFnToClassCompiler implements Context.FunctionCompiler {
 //            env.setOptimizationLevel(9); // TODO
 
             ClassCompiler compiler = new ClassCompiler(env);
-            String className = "CompiledFunction" + Math.abs(ifun.hashCode());
+            String className = "CompiledFunction" + (ifun.hashCode() & 0x7FFFFFFF);
             String fullClassName = "org.mozilla.javascript.compiled." + className;
 
             Object[] results =
