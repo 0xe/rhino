@@ -20,7 +20,7 @@ public class IFnToClassCompiler implements Context.FunctionCompiler {
             CompilerEnvirons env = new CompilerEnvirons();
             env.initFromContext(cx);
             env.setInterpretedMode(false);
-//            env.setOptimizationLevel(9); // TODO
+            //            env.setOptimizationLevel(9); // TODO
 
             ClassCompiler compiler = new ClassCompiler(env);
             String className = "CompiledFunction" + (ifun.hashCode() & 0x7FFFFFFF);

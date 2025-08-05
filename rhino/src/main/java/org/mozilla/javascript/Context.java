@@ -2455,9 +2455,9 @@ public class Context implements Closeable {
         applicationClassLoader = loader;
     }
 
-    // TODO: default function compiler
-    //    FunctionCompiler functionCompiler = null;
-    FunctionCompiler functionCompiler = new IFnToClassCompiler();
+    // Use safer compiler that avoids VerifyErrors by falling back to interpretation
+    // for complex functions
+    FunctionCompiler functionCompiler = new SafeBytecodeToClassCompiler();
 
     /** Interface for compiling interpreted functions to optimized bytecode. */
     public interface FunctionCompiler {
