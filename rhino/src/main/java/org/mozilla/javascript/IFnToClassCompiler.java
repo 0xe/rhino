@@ -17,10 +17,15 @@ public class IFnToClassCompiler implements Context.FunctionCompiler {
                 return null; // No source available
             }
 
+            if (idata.itsNeedsActivation) {
+                ifun.compilationAttempted = true;
+                return null;
+            }
+
             CompilerEnvirons env = new CompilerEnvirons();
             env.initFromContext(cx);
-            env.setInterpretedMode(false);
-//            env.setOptimizationLevel(9); // TODO
+            //            env.setInterpretedMode(false);
+            //            env.setOptimizationLevel(9); // TODO
 
             ClassCompiler compiler = new ClassCompiler(env);
             String className = "CompiledFunction" + (ifun.hashCode() & 0x7FFFFFFF);
@@ -55,11 +60,19 @@ public class IFnToClassCompiler implements Context.FunctionCompiler {
                     };
 
             Class<?> clazz = loader.loadClass(fullClassName);
-
-            // TODO: is it always the first constructor?
-            // TODO: _id is 1?
-            // Create a new instance of the compiled function
-            return (Callable) clazz.getDeclaredConstructors()[0].newInstance(scope, cx, 1);
+            NativeCall n =
+                    new NativeCall(
+                            ifun,
+                            cx,
+                            ifun.getParentScope(),
+                            args,
+                            false,
+                            false,
+                            false,
+                            false,
+                            null);
+            n.parentActivationCall = cx.currentActivationCall;
+            return (Callable) clazz.getDeclaredConstructors()[0].newInstance(n, cx, 1);
 
         } catch (Exception e) {
             // Log the error and fall back to interpretation

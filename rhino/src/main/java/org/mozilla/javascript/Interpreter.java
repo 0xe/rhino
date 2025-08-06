@@ -3395,6 +3395,7 @@ public final class Interpreter extends Icode implements Evaluator {
                 // state between the interpreter and the compiler)
                 if (cx.hasFeature(Context.FEATURE_FUNCTION_COMPILATION)
                         && !cx.isContinuationsTopCall
+                        && !ifun.idata.itsNeedsActivation
                         && ifun.shouldCompile(cx)) {
                     // Try to compile the function
                     if (!ifun.isCompiled()) {
@@ -3447,12 +3448,12 @@ public final class Interpreter extends Icode implements Evaluator {
                     cx.lastInterpreterFrame = frame;
                     frame.savedCallOp = op;
                     frame.savedStackTop = stackTop;
-                    stack[stackTop] = ifun.call(
-                            cx,
-                            calleeScope,
-                            funThisObj,
-                            getArgsArray(
-                                    stack, sDbl, stackTop + 1, indexReg));
+                    stack[stackTop] =
+                            ifun.call(
+                                    cx,
+                                    calleeScope,
+                                    funThisObj,
+                                    getArgsArray(stack, sDbl, stackTop + 1, indexReg));
                     return new ContinueLoop(frame, stackTop, indexReg);
                 }
 
