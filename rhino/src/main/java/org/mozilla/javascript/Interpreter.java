@@ -3384,113 +3384,124 @@ public final class Interpreter extends Icode implements Evaluator {
                 }
             }
 
-            if (fun instanceof InterpretedFunction &&
-                    !((InterpretedFunction) fun).idata.itsNeedsActivation) {
+            if (fun instanceof InterpretedFunction
+                    && !((InterpretedFunction) fun).idata.itsNeedsActivation) {
                 InterpretedFunction ifun = (InterpretedFunction) fun;
                 if (frame.fnOrScript.securityDomain == ifun.securityDomain) {
                     // Increment the call count
-                ifun.invocationCount++;
+                    ifun.invocationCount++;
 
-                // Check if function compilation is enabled and if this function should be compiled
-                // Skip compilation only during continuation contexts (continuations have different
-                // state between the interpreter and the compiler)
-                if (cx.hasFeature(Context.FEATURE_FUNCTION_COMPILATION)
-                        && !cx.isContinuationsTopCall
-                        && ifun.shouldCompile(cx)) {
-                    // Try to compile the function
-                    if (!ifun.isCompiled()) {
+                    // Check if function compilation is enabled and if this function should be
+                    // compiled
+                    // Skip compilation only during continuation contexts (continuations have
+                    // different
+                    // state between the interpreter and the compiler)
+                    if (cx.hasFeature(Context.FEATURE_FUNCTION_COMPILATION)
+                            && !cx.isContinuationsTopCall
+                            && ifun.shouldCompile(cx)) {
+                        // Try to compile the function
+                        if (!ifun.isCompiled()) {
 
-                        // Get the function compiler
-                        Context.FunctionCompiler compiler = cx.getFunctionCompiler();
-                        if (compiler != null) {
-                            try {
-                                // Try to compile the function
-                                Callable compiledFunction =
-                                        compiler.compile(
-                                                ifun,
-                                                cx,
-                                                calleeScope,
-                                                funThisObj,
-                                                getArgsArray(stack, sDbl, state.stackTop + 1, state.indexReg));
-                                if (compiledFunction != null) {
-                                    // Store the compiled function in the InterpretedFunction
-                                    // This will cause future calls to be delegated to the compiled
-                                    // version
-                                    ifun.setCompiledFunction(compiledFunction);
-
-                                    // Also use the compiled function for this current call
-                                    cx.lastInterpreterFrame = frame;
-                                    frame.savedCallOp = op;
-                                    frame.savedStackTop = state.stackTop;
-                                    stack[state.stackTop] =
-                                            compiledFunction.call(
+                            // Get the function compiler
+                            Context.FunctionCompiler compiler = cx.getFunctionCompiler();
+                            if (compiler != null) {
+                                try {
+                                    // Try to compile the function
+                                    Callable compiledFunction =
+                                            compiler.compile(
+                                                    ifun,
                                                     cx,
                                                     calleeScope,
                                                     funThisObj,
                                                     getArgsArray(
-                                                            stack, sDbl, state.stackTop + 1, state.indexReg));
-                                    return new StateContinueResult(frame, state.indexReg);
-                                }
-                            } catch (Exception e) {
-                                // failed, mark as attempted so we don't try again
-                                ifun.markCompilationAttempted();
-                                // TODO: should log why we failed
-                                // TODO: should we attempt a few times and "give up"?
-                                // rethrow continuation pending if we have one
-                                if (e instanceof ContinuationPending) {
-                                    throw e;
+                                                            stack,
+                                                            sDbl,
+                                                            state.stackTop + 1,
+                                                            state.indexReg));
+                                    if (compiledFunction != null) {
+                                        // Store the compiled function in the InterpretedFunction
+                                        // This will cause future calls to be delegated to the
+                                        // compiled
+                                        // version
+                                        ifun.setCompiledFunction(compiledFunction);
+
+                                        // Also use the compiled function for this current call
+                                        cx.lastInterpreterFrame = frame;
+                                        frame.savedCallOp = op;
+                                        frame.savedStackTop = state.stackTop;
+                                        stack[state.stackTop] =
+                                                compiledFunction.call(
+                                                        cx,
+                                                        calleeScope,
+                                                        funThisObj,
+                                                        getArgsArray(
+                                                                stack,
+                                                                sDbl,
+                                                                state.stackTop + 1,
+                                                                state.indexReg));
+                                        return new StateContinueResult(frame, state.indexReg);
+                                    }
+                                } catch (Exception e) {
+                                    // failed, mark as attempted so we don't try again
+                                    ifun.markCompilationAttempted();
+                                    // TODO: should log why we failed
+                                    // TODO: should we attempt a few times and "give up"?
+                                    // rethrow continuation pending if we have one
+                                    if (e instanceof ContinuationPending) {
+                                        throw e;
+                                    }
                                 }
                             }
                         }
                     }
-                }
-                if (ifun.isCompiled()) {
-                    cx.lastInterpreterFrame = frame;
-                    frame.savedCallOp = op;
-                    frame.savedStackTop = state.stackTop;
-                    stack[state.stackTop] =
-                            ifun.call(
+                    if (ifun.isCompiled()) {
+                        cx.lastInterpreterFrame = frame;
+                        frame.savedCallOp = op;
+                        frame.savedStackTop = state.stackTop;
+                        stack[state.stackTop] =
+                                ifun.call(
+                                        cx,
+                                        calleeScope,
+                                        funThisObj,
+                                        getArgsArray(
+                                                stack, sDbl, state.stackTop + 1, state.indexReg));
+                        return new StateContinueResult(frame, state.indexReg);
+                    }
+
+                    CallFrame callParentFrame = frame;
+                    if (op == Icode_TAIL_CALL) {
+                        // In principle tail call can re-use the current
+                        // frame and its stack arrays but it is hard to
+                        // do properly. Any exceptions that can legally
+                        // happen during frame re-initialization including
+                        // StackOverflowException during innocent looking
+                        // System.arraycopy may leave the current frame
+                        // data corrupted leading to undefined behaviour
+                        // in the catch code bellow that unwinds JS stack
+                        // on exceptions. Then there is issue about frame
+                        // release
+                        // end exceptions there.
+                        // To avoid frame allocation a released frame
+                        // can be cached for re-use which would also benefit
+                        // non-tail calls but it is not clear that this
+                        // caching
+                        // would gain in performance due to potentially
+                        // bad interaction with GC.
+                        callParentFrame = frame.parentFrame;
+                        // Release the current frame. See Bug #344501 to see
+                        // why
+                        // it is being done here.
+                        exitFrame(cx, frame, null);
+                    }
+                    CallFrame calleeFrame =
+                            initFrame(
                                     cx,
                                     calleeScope,
                                     funThisObj,
-                                    getArgsArray(stack, sDbl, state.stackTop + 1, state.indexReg));
-                    return new StateContinueResult(frame, state.indexReg);
-                }
-
-                CallFrame callParentFrame = frame;
-                if (op == Icode_TAIL_CALL) {
-                    // In principle tail call can re-use the current
-                    // frame and its stack arrays but it is hard to
-                    // do properly. Any exceptions that can legally
-                    // happen during frame re-initialization including
-                    // StackOverflowException during innocent looking
-                    // System.arraycopy may leave the current frame
-                    // data corrupted leading to undefined behaviour
-                    // in the catch code bellow that unwinds JS stack
-                    // on exceptions. Then there is issue about frame
-                    // release
-                    // end exceptions there.
-                    // To avoid frame allocation a released frame
-                    // can be cached for re-use which would also benefit
-                    // non-tail calls but it is not clear that this
-                    // caching
-                    // would gain in performance due to potentially
-                    // bad interaction with GC.
-                    callParentFrame = frame.parentFrame;
-                    // Release the current frame. See Bug #344501 to see
-                    // why
-                    // it is being done here.
-                    exitFrame(cx, frame, null);
-                }
-                CallFrame calleeFrame =
-                        initFrame(
-                                cx,
-                                calleeScope,
-                                funThisObj,
-                                funHomeObj,
-                                stack,
-                                sDbl,
-                                boundArgs,
+                                    funHomeObj,
+                                    stack,
+                                    sDbl,
+                                    boundArgs,
                                     state.stackTop + 1,
                                     state.indexReg,
                                     ifun,
