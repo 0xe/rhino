@@ -3384,7 +3384,8 @@ public final class Interpreter extends Icode implements Evaluator {
                 }
             }
 
-            if (fun instanceof InterpretedFunction) {
+            if (fun instanceof InterpretedFunction &&
+                    !((InterpretedFunction) fun).idata.itsNeedsActivation) {
                 InterpretedFunction ifun = (InterpretedFunction) fun;
                 if (frame.fnOrScript.securityDomain == ifun.securityDomain) {
                     // Increment the call count
@@ -3395,7 +3396,6 @@ public final class Interpreter extends Icode implements Evaluator {
                 // state between the interpreter and the compiler)
                 if (cx.hasFeature(Context.FEATURE_FUNCTION_COMPILATION)
                         && !cx.isContinuationsTopCall
-                        && !ifun.idata.itsNeedsActivation
                         && ifun.shouldCompile(cx)) {
                     // Try to compile the function
                     if (!ifun.isCompiled()) {
@@ -3411,7 +3411,7 @@ public final class Interpreter extends Icode implements Evaluator {
                                                 cx,
                                                 calleeScope,
                                                 funThisObj,
-                                                getArgsArray(stack, sDbl, stackTop + 1, indexReg));
+                                                getArgsArray(stack, sDbl, state.stackTop + 1, state.indexReg));
                                 if (compiledFunction != null) {
                                     // Store the compiled function in the InterpretedFunction
                                     // This will cause future calls to be delegated to the compiled
@@ -3421,15 +3421,15 @@ public final class Interpreter extends Icode implements Evaluator {
                                     // Also use the compiled function for this current call
                                     cx.lastInterpreterFrame = frame;
                                     frame.savedCallOp = op;
-                                    frame.savedStackTop = stackTop;
-                                    stack[stackTop] =
+                                    frame.savedStackTop = state.stackTop;
+                                    stack[state.stackTop] =
                                             compiledFunction.call(
                                                     cx,
                                                     calleeScope,
                                                     funThisObj,
                                                     getArgsArray(
-                                                            stack, sDbl, stackTop + 1, indexReg));
-                                    return new ContinueLoop(frame, stackTop, indexReg);
+                                                            stack, sDbl, state.stackTop + 1, state.indexReg));
+                                    return new StateContinueResult(frame, state.indexReg);
                                 }
                             } catch (Exception e) {
                                 // failed, mark as attempted so we don't try again
@@ -3447,14 +3447,14 @@ public final class Interpreter extends Icode implements Evaluator {
                 if (ifun.isCompiled()) {
                     cx.lastInterpreterFrame = frame;
                     frame.savedCallOp = op;
-                    frame.savedStackTop = stackTop;
-                    stack[stackTop] =
+                    frame.savedStackTop = state.stackTop;
+                    stack[state.stackTop] =
                             ifun.call(
                                     cx,
                                     calleeScope,
                                     funThisObj,
-                                    getArgsArray(stack, sDbl, stackTop + 1, indexReg));
-                    return new ContinueLoop(frame, stackTop, indexReg);
+                                    getArgsArray(stack, sDbl, state.stackTop + 1, state.indexReg));
+                    return new StateContinueResult(frame, state.indexReg);
                 }
 
                 CallFrame callParentFrame = frame;
