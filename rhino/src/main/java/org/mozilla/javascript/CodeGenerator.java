@@ -610,7 +610,9 @@ class CodeGenerator extends Icode {
         int savedStackDepth = stackDepth;
 
         // Check for constructs that can't be compiled in chunk compilation
-        checkForUnsupportedConstructs(type, node);
+        if (!itsData.usesConstructionsThatCantBeCompiledInChunk) {
+            checkForUnsupportedConstructs(type, node);
+        }
 
         switch (type) {
             case Token.FUNCTION:
