@@ -40,13 +40,13 @@ final class InterpretedFunction extends NativeFunction implements Script {
     boolean shouldCompile(Context cx) {
         return !compilationAttempted
                 && cx.hasFunctionCompiler()
-                && !usesContinuations() // Don't compile functions that use continuations
+                && !usesConstructionsThatCantBeCompiledInChunk() // Don't compile functions that use continuations
                 && (invocationCount
                         >= Context.getCurrentContext().getFunctionCompilationThreshold());
     }
 
     // TODO: bad hack; needs proper fix!
-    boolean usesContinuations() {
+    boolean usesConstructionsThatCantBeCompiledInChunk() {
         if (idata.itsSourceFile != null && getRawSource() != null) {
             String source = getRawSource();
             // Check for continuation-related patterns, promise-creation patterns, and
@@ -55,6 +55,7 @@ final class InterpretedFunction extends NativeFunction implements Script {
             // that requires
             // actual work. Good enough for a dirty prototype...
             return source.contains("Continuation")
+                    || source.contains("finally")
                     || source.contains("getContinuation")
                     || source.contains("resumeContinuation")
                     || source.contains("new Promise")
