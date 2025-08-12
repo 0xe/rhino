@@ -2923,8 +2923,8 @@ public final class Interpreter extends Icode implements Evaluator {
             }
         }
 
-        if (fun instanceof InterpretedFunction &&
-                !((InterpretedFunction) fun).idata.itsNeedsActivation) {
+        if (fun instanceof InterpretedFunction
+                && !((InterpretedFunction) fun).idata.itsNeedsActivation) {
             InterpretedFunction ifun = (InterpretedFunction) fun;
             if (frame.fnOrScript.securityDomain == ifun.securityDomain) {
                 // Increment the call count
