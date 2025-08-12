@@ -268,6 +268,52 @@ class CodeGenerator extends Icode {
         }
     }
 
+    private void checkForUnsupportedConstructs(int type, Node node) {
+        // Check for constructs that can't be compiled in chunk compilation
+        switch (type) {
+            case Token.FINALLY:
+            case Token.TRY:
+            case Token.YIELD:
+            case Token.YIELD_STAR:
+                itsData.usesConstructionsThatCantBeCompiledInChunk = true;
+                break;
+
+            case Token.NEW:
+                // Check if this is new Continuation() or new Promise()
+                if (node != null) {
+                    Node child = node.getFirstChild();
+                    if (child != null && child.getType() == Token.NAME) {
+                        String name = child.getString();
+                        if ("Continuation".equals(name) || "Promise".equals(name)) {
+                            itsData.usesConstructionsThatCantBeCompiledInChunk = true;
+                        }
+                    }
+                }
+                break;
+
+            case Token.CALL:
+                // Check for getContinuation() or resumeContinuation() calls
+                if (node != null) {
+                    Node child = node.getFirstChild();
+                    if (child != null && child.getType() == Token.NAME) {
+                        String name = child.getString();
+                        if ("getContinuation".equals(name) || "resumeContinuation".equals(name)) {
+                            itsData.usesConstructionsThatCantBeCompiledInChunk = true;
+                        }
+                    }
+                }
+                break;
+        }
+
+        // For generators, check if the function itself is a generator
+        if (scriptOrFn instanceof FunctionNode) {
+            FunctionNode fn = (FunctionNode) scriptOrFn;
+            if (fn.isGenerator() || fn.isES6Generator()) {
+                itsData.usesConstructionsThatCantBeCompiledInChunk = true;
+            }
+        }
+    }
+
     private static RuntimeException badTree(Node node) {
         throw new RuntimeException(node.toString());
     }
@@ -275,6 +321,12 @@ class CodeGenerator extends Icode {
     private void visitStatement(Node node, int initialStackDepth) {
         int type = node.getType();
         Node child = node.getFirstChild();
+
+        // Check for constructs that can't be compiled in chunk compilation
+        if (!itsData.usesConstructionsThatCantBeCompiledInChunk) {
+            checkForUnsupportedConstructs(type, node);
+        }
+
         switch (type) {
             case Token.FUNCTION:
                 {
@@ -556,6 +608,10 @@ class CodeGenerator extends Icode {
         int type = node.getType();
         Node child = node.getFirstChild();
         int savedStackDepth = stackDepth;
+
+        // Check for constructs that can't be compiled in chunk compilation
+        checkForUnsupportedConstructs(type, node);
+
         switch (type) {
             case Token.FUNCTION:
                 {
