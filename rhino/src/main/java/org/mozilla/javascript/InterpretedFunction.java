@@ -40,11 +40,10 @@ final class InterpretedFunction extends NativeFunction implements Script {
     boolean shouldCompile(Context cx) {
         return !compilationAttempted
                 && cx.hasFunctionCompiler()
-                && !this.idata.itsNeedsActivation
                 && !usesConstructionsThatCantBeCompiledInChunk() // Don't compile functions that use
                 // continuations
-                && (invocationCount >= cx.getFunctionCompilationThreshold())
-                && (idata.itsICode.length >= cx.getFunctionCompilationIcodeSizeThreshold());
+                && (invocationCount
+                        >= Context.getCurrentContext().getFunctionCompilationThreshold());
     }
 
     // TODO: bad hack; needs proper fix!
