@@ -25,6 +25,8 @@ public class FunctionCompilationTest {
             cx.setInterpretedMode(true);
             cx.setLanguageVersion(Context.VERSION_ES6);
             cx.setFunctionCompilationThreshold(5); // Set a low threshold for testing
+            cx.setFunctionCompilationIcodeSizeThreshold(
+                    5); // Set a very low icode size threshold for basic tests
             super.onContextCreated(cx);
         }
     }
@@ -304,6 +306,224 @@ public class FunctionCompilationTest {
                     //            assertFalse("func2 should not be marked as compiled",
                     // ifun2.isCompiled());
                 });
+    }
+
+    @Test
+    public void testDebugIcodeSizes() throws Exception {
+        withContext(
+                (cx, scope) -> {
+                    // Define various functions to see their icode sizes
+                    String script =
+                            "function simpleFunction() { return 'simple'; }\n"
+                                    + "function mediumFunction(x) { return x + 1; }\n"
+                                    + "function complexFunction(x, y) {\n"
+                                    + "  var a = x + y;\n"
+                                    + "  if (a > 10) {\n"
+                                    + "    return a * 2;\n"
+                                    + "  } else {\n"
+                                    + "    return a + 1;\n"
+                                    + "  }\n"
+                                    + "}\n";
+
+                    // Execute the script
+                    cx.evaluateString(scope, script, "debug-test", 1, null);
+
+                    // Check icode sizes
+                    Object simpleFn = ScriptableObject.getProperty(scope, "simpleFunction");
+                    Object mediumFn = ScriptableObject.getProperty(scope, "mediumFunction");
+                    Object complexFn = ScriptableObject.getProperty(scope, "complexFunction");
+
+                    assertTrue(
+                            "simpleFunction should be a function",
+                            simpleFn instanceof InterpretedFunction);
+                    assertTrue(
+                            "mediumFunction should be a function",
+                            mediumFn instanceof InterpretedFunction);
+                    assertTrue(
+                            "complexFunction should be a function",
+                            complexFn instanceof InterpretedFunction);
+
+                    InterpretedFunction simpleIfun = (InterpretedFunction) simpleFn;
+                    InterpretedFunction mediumIfun = (InterpretedFunction) mediumFn;
+                    InterpretedFunction complexIfun = (InterpretedFunction) complexFn;
+
+                    int simpleIcodeSize = simpleIfun.idata.itsICode.length;
+                    int mediumIcodeSize = mediumIfun.idata.itsICode.length;
+                    int complexIcodeSize = complexIfun.idata.itsICode.length;
+
+                    System.out.println("Simple function icode size: " + simpleIcodeSize);
+                    System.out.println("Medium function icode size: " + mediumIcodeSize);
+                    System.out.println("Complex function icode size: " + complexIcodeSize);
+
+                    // This test is just for debugging - we'll adjust our threshold based on these
+                    // results
+                });
+    }
+
+    @Test
+    public void testIcodeSizeThreshold() throws Exception {
+        // Create a context factory with very high icode size threshold to test that small functions
+        // don't compile
+        ContextFactory factoryWithHighIcodeThreshold =
+                new ContextFactory() {
+                    @Override
+                    protected boolean hasFeature(Context cx, int featureIndex) {
+                        if (featureIndex == Context.FEATURE_FUNCTION_COMPILATION) {
+                            return true;
+                        }
+                        return super.hasFeature(cx, featureIndex);
+                    }
+
+                    @Override
+                    protected void onContextCreated(Context cx) {
+                        cx.setInterpretedMode(true);
+                        cx.setLanguageVersion(Context.VERSION_ES6);
+                        cx.setFunctionCompilationThreshold(1); // Very low invocation threshold
+                        cx.setFunctionCompilationIcodeSizeThreshold(
+                                10000); // Very high icode size threshold
+                        super.onContextCreated(cx);
+                    }
+                };
+
+        Context cx = factoryWithHighIcodeThreshold.enterContext();
+        try {
+            ScriptableObject scope = cx.initStandardObjects();
+
+            // Track compilation attempts
+            final boolean[] compiled = {false};
+            cx.setFunctionCompiler(
+                    new Context.FunctionCompiler() {
+                        @Override
+                        public Callable compile(
+                                InterpretedFunction ifun,
+                                Context cx,
+                                Scriptable scope,
+                                Scriptable thisObj,
+                                Object[] args) {
+                            compiled[0] = true;
+                            return null; // Return null to continue with interpretation
+                        }
+                    });
+
+            // Define a very simple function with small icode
+            String script =
+                    "function smallFunction(x) {\n"
+                            + "  return x + 1;\n"
+                            + // Very simple function - should have small icode
+                            "}\n"
+                            + "\n"
+                            + "// Call many times to exceed invocation threshold\n"
+                            + "var result = 0;\n"
+                            + "for (var i = 0; i < 10; i++) {\n"
+                            + "  result += smallFunction(i);\n"
+                            + "}\n"
+                            + "result;";
+
+            // Execute the script
+            Object result = cx.evaluateString(scope, script, "icode-size-test", 1, null);
+
+            // Get the function object to check its state
+            Object testFn = ScriptableObject.getProperty(scope, "smallFunction");
+            assertTrue("smallFunction should be a function", testFn instanceof InterpretedFunction);
+            InterpretedFunction ifun = (InterpretedFunction) testFn;
+
+            // The function should have been called many times but not compiled due to small icode
+            // size
+            assertFalse(
+                    "Function should not be compiled due to insufficient icode size", compiled[0]);
+            assertTrue(
+                    "Function should have been called more than threshold",
+                    ifun.getInvocationCount() > 1);
+        } finally {
+            Context.exit();
+        }
+    }
+
+    @Test
+    public void testBothThresholdsMustBeMet() throws Exception {
+        // Test that both invocation count AND icode size thresholds must be met for compilation
+        ContextFactory factoryWithBothThresholds =
+                new ContextFactory() {
+                    @Override
+                    protected boolean hasFeature(Context cx, int featureIndex) {
+                        if (featureIndex == Context.FEATURE_FUNCTION_COMPILATION) {
+                            return true;
+                        }
+                        return super.hasFeature(cx, featureIndex);
+                    }
+
+                    @Override
+                    protected void onContextCreated(Context cx) {
+                        cx.setInterpretedMode(true);
+                        cx.setLanguageVersion(Context.VERSION_ES6);
+                        cx.setFunctionCompilationThreshold(10); // Higher invocation threshold
+                        cx.setFunctionCompilationIcodeSizeThreshold(
+                                50); // Reasonable icode size threshold
+                        super.onContextCreated(cx);
+                    }
+                };
+
+        Context cx = factoryWithBothThresholds.enterContext();
+        try {
+            ScriptableObject scope = cx.initStandardObjects();
+
+            // Track compilation attempts
+            final boolean[] compiled = {false};
+            cx.setFunctionCompiler(
+                    new Context.FunctionCompiler() {
+                        @Override
+                        public Callable compile(
+                                InterpretedFunction ifun,
+                                Context cx,
+                                Scriptable scope,
+                                Scriptable thisObj,
+                                Object[] args) {
+                            compiled[0] = true;
+                            return null; // Return null to continue with interpretation
+                        }
+                    });
+
+            // Define a complex function with large icode but call it only a few times
+            String script =
+                    "function complexFunction(x, y, z) {\n"
+                            + "  var a = x + y;\n"
+                            + "  var b = y + z;\n"
+                            + "  var c = z + x;\n"
+                            + "  if (a > b && b > c) {\n"
+                            + "    return a * b * c;\n"
+                            + "  } else if (b > c && c > a) {\n"
+                            + "    return b * c * a;\n"
+                            + "  } else {\n"
+                            + "    return c * a * b;\n"
+                            + "  }\n"
+                            + "}\n"
+                            + "\n"
+                            + "// Call only a few times (less than invocation threshold)\n"
+                            + "var result = 0;\n"
+                            + "for (var i = 0; i < 5; i++) {\n"
+                            + "  result += complexFunction(i, i+1, i+2);\n"
+                            + "}\n"
+                            + "result;";
+
+            // Execute the script
+            Object result = cx.evaluateString(scope, script, "both-thresholds-test", 1, null);
+
+            // Get the function object to check its state
+            Object testFn = ScriptableObject.getProperty(scope, "complexFunction");
+            assertTrue(
+                    "complexFunction should be a function", testFn instanceof InterpretedFunction);
+            InterpretedFunction ifun = (InterpretedFunction) testFn;
+
+            // The function should not be compiled because invocation count is too low
+            assertFalse(
+                    "Function should not be compiled due to insufficient invocation count",
+                    compiled[0]);
+            assertTrue(
+                    "Function should have been called less than threshold",
+                    ifun.getInvocationCount() < 10);
+        } finally {
+            Context.exit();
+        }
     }
 
     @Test

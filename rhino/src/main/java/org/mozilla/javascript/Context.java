@@ -2507,6 +2507,9 @@ public class Context implements Closeable {
     // Function compilation threshold
     private int functionCompilationThreshold = 5; // Default threshold
 
+    // Function compilation icode size threshold
+    private int functionCompilationIcodeSizeThreshold = 100; // Default icode size threshold
+
     /**
      * Gets the invocation threshold after which functions will be considered for compilation.
      *
@@ -2528,6 +2531,29 @@ public class Context implements Closeable {
             throw new IllegalArgumentException("Threshold must be non-negative");
         }
         this.functionCompilationThreshold = threshold;
+    }
+
+    /**
+     * Gets the icode size threshold after which functions will be considered for compilation.
+     *
+     * @return the current icode size compilation threshold
+     */
+    public int getFunctionCompilationIcodeSizeThreshold() {
+        return functionCompilationIcodeSizeThreshold;
+    }
+
+    /**
+     * Sets the icode size threshold after which functions will be considered for compilation.
+     *
+     * @param threshold the new icode size compilation threshold (must be >= 0)
+     * @throws IllegalArgumentException if threshold is negative
+     */
+    public void setFunctionCompilationIcodeSizeThreshold(int threshold) {
+        if (sealed) onSealedMutation();
+        if (threshold < 0) {
+            throw new IllegalArgumentException("Icode size threshold must be non-negative");
+        }
+        this.functionCompilationIcodeSizeThreshold = threshold;
     }
 
     /**
