@@ -2923,20 +2923,19 @@ public final class Interpreter extends Icode implements Evaluator {
             }
         }
 
-        if (fun instanceof InterpretedFunction
-                && !((InterpretedFunction) fun).idata.itsNeedsActivation) {
+        if (fun instanceof InterpretedFunction) {
             InterpretedFunction ifun = (InterpretedFunction) fun;
+            // Increment the call count
+            ifun.invocationCount++;
             if (frame.fnOrScript.securityDomain == ifun.securityDomain) {
-                // Increment the call count
-                ifun.invocationCount++;
-
                 // Check if function compilation is enabled and if this function should be compiled
                 // Skip compilation only during continuation contexts (continuations have different
                 // state between the interpreter and the compiler)
                 if (cx.hasFeature(Context.FEATURE_FUNCTION_COMPILATION)
+                        && !((InterpretedFunction) fun).idata.itsNeedsActivation
                         && !cx.isContinuationsTopCall
-                        && !ifun.idata.itsNeedsActivation
                         && ifun.shouldCompile(cx)) {
+
                     // Try to compile the function
                     if (!ifun.isCompiled()) {
 
@@ -2983,18 +2982,6 @@ public final class Interpreter extends Icode implements Evaluator {
                             }
                         }
                     }
-                }
-                if (ifun.isCompiled()) {
-                    cx.lastInterpreterFrame = frame;
-                    frame.savedCallOp = op;
-                    frame.savedStackTop = stackTop;
-                    stack[stackTop] =
-                            ifun.call(
-                                    cx,
-                                    calleeScope,
-                                    funThisObj,
-                                    getArgsArray(stack, sDbl, stackTop + 1, indexReg));
-                    return new ContinueLoop(frame, stackTop, indexReg);
                 }
 
                 CallFrame callParentFrame = frame;
@@ -3066,6 +3053,10 @@ public final class Interpreter extends Icode implements Evaluator {
                 frame.stack[stackTop] = captureContinuation(cx, frame.parentFrame, false);
                 return new ContinueLoop(frame, stackTop, indexReg);
             }
+        }
+
+        if (fun instanceof InterpretedFunction) {
+            var ifun = (InterpretedFunction) fun;
         }
 
         cx.lastInterpreterFrame = frame;

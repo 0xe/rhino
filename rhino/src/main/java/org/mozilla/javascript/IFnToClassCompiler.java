@@ -1,5 +1,6 @@
 package org.mozilla.javascript;
 
+import java.util.concurrent.atomic.AtomicInteger;
 import org.mozilla.javascript.optimizer.ClassCompiler;
 
 public class IFnToClassCompiler implements Context.FunctionCompiler {
@@ -28,7 +29,8 @@ public class IFnToClassCompiler implements Context.FunctionCompiler {
             //            env.setOptimizationLevel(9); // TODO
 
             ClassCompiler compiler = new ClassCompiler(env);
-            String className = "CompiledFunction" + (ifun.hashCode() & 0x7FFFFFFF);
+            AtomicInteger counter = new AtomicInteger();
+            String className = "CompiledFunction" + counter;
             String fullClassName = "org.mozilla.javascript.compiled." + className;
 
             Object[] results =
@@ -60,20 +62,14 @@ public class IFnToClassCompiler implements Context.FunctionCompiler {
                     };
 
             Class<?> clazz = loader.loadClass(fullClassName);
-            NativeCall n =
-                    new NativeCall(
-                            ifun,
-                            cx,
-                            ifun.getParentScope(),
-                            args,
-                            false,
-                            false,
-                            false,
-                            false,
-                            null);
-            n.parentActivationCall = cx.currentActivationCall;
-            return (Callable) clazz.getDeclaredConstructors()[0].newInstance(n, cx, 1);
-
+            var compiledFunction =
+                    (NativeFunction)
+                            clazz.getDeclaredConstructors()[0].newInstance(
+                                    ifun.getParentScope(), cx, 1);
+            compiledFunction.setPrototypeProperty(ifun.getPrototypeProperty());
+            compiledFunction.setHomeObject(ifun.getHomeObject());
+            // TODO: strict mode is set in idata
+            return compiledFunction;
         } catch (Exception e) {
             // Log the error and fall back to interpretation
             Context.reportError("Error compiling function: " + e);
