@@ -33,6 +33,7 @@ public class ContinuationComparisonTest {
         try (Context cx = Context.enter()) {
             cx.setLanguageVersion(Context.VERSION_DEFAULT);
             cx.setInterpretedMode(true); // interpreter for continuations
+            cx.setFunctionCompiler(null); // turn off function compilation
             ScriptableObject global = cx.initStandardObjects();
             final AtomicReference<NativeContinuation> captured = new AtomicReference<>();
             ScriptableObject.putProperty(

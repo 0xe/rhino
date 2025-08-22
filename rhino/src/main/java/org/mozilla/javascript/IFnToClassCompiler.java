@@ -4,6 +4,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.mozilla.javascript.optimizer.ClassCompiler;
 
 public class IFnToClassCompiler implements Context.FunctionCompiler {
+    static AtomicInteger counter = new AtomicInteger();
 
     @Override
     public Callable compile(
@@ -30,8 +31,7 @@ public class IFnToClassCompiler implements Context.FunctionCompiler {
             //            env.setOptimizationLevel(9); // TODO
 
             ClassCompiler compiler = new ClassCompiler(env);
-            AtomicInteger counter = new AtomicInteger();
-            String className = "CompiledFunction" + counter;
+            String className = "CompiledFunction" + counter.getAndIncrement();
             String fullClassName = "org.mozilla.javascript.compiled." + className;
 
             Object[] results =
@@ -77,7 +77,6 @@ public class IFnToClassCompiler implements Context.FunctionCompiler {
                 compiledFunction.put("name", compiledFunction, functionName);
             }
 
-            // TODO: strict mode is set in idata
             return compiledFunction;
         } catch (Exception e) {
             // Log the error and fall back to interpretation
