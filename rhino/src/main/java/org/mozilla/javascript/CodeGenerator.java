@@ -17,6 +17,7 @@ import org.mozilla.javascript.ast.AstRoot;
 import org.mozilla.javascript.ast.Block;
 import org.mozilla.javascript.ast.FunctionNode;
 import org.mozilla.javascript.ast.Jump;
+import org.mozilla.javascript.ast.Name;
 import org.mozilla.javascript.ast.Scope;
 import org.mozilla.javascript.ast.ScriptNode;
 import org.mozilla.javascript.ast.TemplateCharacters;
@@ -268,6 +269,41 @@ class CodeGenerator extends Icode {
         }
     }
 
+    /**
+     * Checks if a function node contains a reference to the given name within its body. This is
+     * used to detect named function expressions that reference themselves.
+     */
+    private boolean hasSelfReference(FunctionNode fn, String functionName) {
+        // Get the function body
+        AstNode body = fn.getBody();
+        if (body != null) {
+            return containsNameReference(body, functionName);
+        }
+        return false;
+    }
+
+    /** Recursively checks if an AST node or its children contain a reference to the given name. */
+    private boolean containsNameReference(AstNode node, String name) {
+        if (node == null) return false;
+
+        // Check if this node is a name reference to our function
+        if (node instanceof Name) {
+            Name nameNode = (Name) node;
+            if (name.equals(nameNode.getIdentifier())) {
+                return true;
+            }
+        }
+
+        // Recursively check all children - AstNode has different iteration
+        for (Node child = node.getFirstChild(); child != null; child = child.getNext()) {
+            if (child instanceof AstNode && containsNameReference((AstNode) child, name)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     private void checkForUnsupportedConstructs(int type, Node node) {
         // Check for constructs that can't be compiled in chunk compilation
         switch (type) {
@@ -276,6 +312,20 @@ class CodeGenerator extends Icode {
             case Token.YIELD:
             case Token.YIELD_STAR:
                 itsData.usesConstructionsThatCantBeCompiledInChunk = true;
+                break;
+
+            case Token.FUNCTION:
+                // Check if this is a named function expression that references itself
+                if (node != null) {
+                    int fnIndex = node.getExistingIntProp(Node.FUNCTION_PROP);
+                    FunctionNode fn = scriptOrFn.getFunctionNode(fnIndex);
+                    if (fn.getFunctionType() == FunctionNode.FUNCTION_EXPRESSION
+                            && fn.getName() != null
+                            && !fn.getName().isEmpty()
+                            && hasSelfReference(fn, fn.getName())) {
+                        itsData.usesConstructionsThatCantBeCompiledInChunk = true;
+                    }
+                }
                 break;
 
             case Token.NEW:

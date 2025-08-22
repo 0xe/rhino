@@ -25,6 +25,7 @@ public class IFnToClassCompiler implements Context.FunctionCompiler {
 
             CompilerEnvirons env = new CompilerEnvirons();
             env.initFromContext(cx);
+            env.setStrictMode(idata.isStrict);
             //            env.setInterpretedMode(false);
             //            env.setOptimizationLevel(9); // TODO
 
@@ -68,6 +69,14 @@ public class IFnToClassCompiler implements Context.FunctionCompiler {
                                     ifun.getParentScope(), cx, 1);
             compiledFunction.setPrototypeProperty(ifun.getPrototypeProperty());
             compiledFunction.setHomeObject(ifun.getHomeObject());
+
+            // Transfer function name from the interpreted function
+            String functionName = ifun.getFunctionName();
+            if (functionName != null && !functionName.isEmpty()) {
+                // Set the name property using the internal name setter mechanism
+                compiledFunction.put("name", compiledFunction, functionName);
+            }
+
             // TODO: strict mode is set in idata
             return compiledFunction;
         } catch (Exception e) {
