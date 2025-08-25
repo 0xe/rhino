@@ -2923,18 +2923,29 @@ public final class Interpreter extends Icode implements Evaluator {
             }
         }
 
-        if (fun instanceof InterpretedFunction) {
+        if (cx.hasFeature(Context.FEATURE_FUNCTION_COMPILATION)
+                && fun instanceof InterpretedFunction
+                && !cx.isContinuationsTopCall
+                && !((InterpretedFunction) fun).idata.itsNeedsActivation) {
             InterpretedFunction ifun = (InterpretedFunction) fun;
             // Increment the call count
             ifun.invocationCount++;
 
-            if (cx.hasFeature(Context.FEATURE_FUNCTION_COMPILATION)
-                    && !((InterpretedFunction) fun).idata.itsNeedsActivation
-                    && !cx.isContinuationsTopCall
-                    && ifun.shouldCompile(cx)) {
+            if (ifun.isCompiled()) {
+                cx.lastInterpreterFrame = frame;
+                frame.savedCallOp = op;
+                frame.savedStackTop = stackTop;
+                stack[stackTop] =
+                        ifun.call(
+                                cx,
+                                calleeScope,
+                                funThisObj,
+                                getArgsArray(stack, sDbl, stackTop + 1, indexReg));
+                return new ContinueLoop(frame, stackTop, indexReg);
+            }
+
+            if (ifun.shouldCompile(cx)) {
                 // Check if function compilation is enabled and if this function should be compiled
-                // Skip compilation only during continuation contexts (continuations have different
-                // state between the interpreter and the compiler)
                 // Try to compile the function
                 if (!ifun.isCompiled()) {
                     // Get the function compiler
