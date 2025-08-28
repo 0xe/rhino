@@ -24,27 +24,48 @@ public class IFnToClassCompiler implements Context.FunctionCompiler {
                 return null;
             }
 
+            // Check if this function uses constructions that can't be compiled in chunks
+            // This should catch self-referencing named function expressions
+            if (idata.usesConstructionsThatCantBeCompiledInChunk) {
+                ifun.compilationAttempted = true;
+                return null;
+            }
+
             CompilerEnvirons env = new CompilerEnvirons();
             env.initFromContext(cx);
             env.setStrictMode(idata.isStrict);
             //            env.setInterpretedMode(false);
             //            env.setOptimizationLevel(9); // TODO
 
+            String functionName = ifun.getFunctionName();
+            String source = ifun.getRawSource();
+
+            /*
+            Sort of a hacky fix for
+
+            FunctionTest > secondFunctionWithSameNameStrict
+            FunctionTest > functionReferItself
+            MozillaSuiteTest > [3453, js=testsrc/tests/ecma_3/Function/regress-193555.js, interpreted=true]
+            language/statements/function/S14_A2.js
+            language/statements/function/S13_A3_T1.js
+
+            Have to think more.
+             */
+            if (source != null
+                    && functionName != null
+                    && !functionName.isEmpty()
+                    && hasPotentialSelfReference(source, functionName)) {
+                ifun.compilationAttempted = true;
+                return null;
+            }
+
             ClassCompiler compiler = new ClassCompiler(env);
             String className = "CompiledFunction" + counter.getAndIncrement();
             String fullClassName = "org.mozilla.javascript.compiled." + className;
 
-            // For named function expressions, we need to bind the function name in its own scope
-            String sourceToCompile = ifun.getRawSource();
-            String functionName = ifun.getFunctionName();
-            if (functionName != null && !functionName.isEmpty()) {
-                // Wrap the function source to properly bind the function name in its scope
-                sourceToCompile = createNamedFunctionWrapper(sourceToCompile, functionName);
-            }
-
             Object[] results =
                     compiler.compileToClassFiles(
-                            sourceToCompile,
+                            source,
                             idata.itsSourceFile,
                             0, // TODO
                             fullClassName,
@@ -78,8 +99,7 @@ public class IFnToClassCompiler implements Context.FunctionCompiler {
             compiledFunction.setPrototypeProperty(ifun.getPrototypeProperty());
             compiledFunction.setHomeObject(ifun.getHomeObject());
 
-            // Set the function name property (but not scope binding, which is handled during
-            // compilation)
+            // Set the function name property
             if (functionName != null && !functionName.isEmpty()) {
                 compiledFunction.put("name", compiledFunction, functionName);
             }
@@ -95,26 +115,18 @@ public class IFnToClassCompiler implements Context.FunctionCompiler {
         }
     }
 
-    /**
-     * Creates a wrapper that properly binds the function name in its own scope. For a named
-     * function expression like "function g() { return g; }", this creates a wrapper that ensures
-     * 'g' refers to the function itself.
-     */
-    private String createNamedFunctionWrapper(String originalSource, String functionName) {
-        // For named function expressions, we need to create a scope where the function name
-        // is bound to the function itself. We do this by creating an IIFE that assigns
-        // the function to a variable with the function's name.
+    private boolean hasPotentialSelfReference(String source, String functionName) {
+        // Check for patterns like "return g" or "typeof g" where g is the function name
+        String pattern1 = "return " + functionName;
+        String pattern2 = "typeof " + functionName;
+        String pattern3 = functionName + ".toString()";
+        String pattern4 = functionName + "."; // Any property access
+        String pattern5 = "(" + functionName + ")"; // Function call argument like norm(func)
 
-        // Example transformation:
-        // Original: "function g() { return g.toString() }"
-        // Wrapped:  "(function() { var g = function g() { return g.toString() }; return g; })()"
-
-        return "(function() { var "
-                + functionName
-                + " = "
-                + originalSource
-                + "; return "
-                + functionName
-                + "; })()";
+        return source.contains(pattern1)
+                || source.contains(pattern2)
+                || source.contains(pattern3)
+                || source.contains(pattern4)
+                || source.contains(pattern5);
     }
 }

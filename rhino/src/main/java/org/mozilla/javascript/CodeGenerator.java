@@ -18,6 +18,7 @@ import org.mozilla.javascript.ast.Block;
 import org.mozilla.javascript.ast.FunctionNode;
 import org.mozilla.javascript.ast.Jump;
 import org.mozilla.javascript.ast.Name;
+import org.mozilla.javascript.ast.PropertyGet;
 import org.mozilla.javascript.ast.Scope;
 import org.mozilla.javascript.ast.ScriptNode;
 import org.mozilla.javascript.ast.TemplateCharacters;
@@ -115,6 +116,11 @@ class CodeGenerator extends Icode {
         }
         if (theFunction.isInStrictMode()) {
             itsData.isStrict = true;
+            // Strict mode functions have different semantics that may not be preserved during
+            // compilation
+            // Disable compilation to ensure correct behavior (ReferenceError for undeclared vars,
+            // etc.)
+            itsData.usesConstructionsThatCantBeCompiledInChunk = true;
         }
         if (theFunction.isES6Generator()) {
             itsData.isES6Generator = true;
@@ -294,6 +300,19 @@ class CodeGenerator extends Icode {
             }
         }
 
+        // Also check for PropertyGet nodes where the target is our function name
+        // This catches cases like "functionName.toString()"
+        if (node instanceof PropertyGet) {
+            PropertyGet propGet = (PropertyGet) node;
+            AstNode target = propGet.getTarget();
+            if (target instanceof Name) {
+                Name nameNode = (Name) target;
+                if (name.equals(nameNode.getIdentifier())) {
+                    return true;
+                }
+            }
+        }
+
         // Recursively check all children - AstNode has different iteration
         for (Node child = node.getFirstChild(); child != null; child = child.getNext()) {
             if (child instanceof AstNode && containsNameReference((AstNode) child, name)) {
@@ -314,6 +333,38 @@ class CodeGenerator extends Icode {
                 itsData.usesConstructionsThatCantBeCompiledInChunk = true;
                 break;
 
+            // Strict mode constructs that might behave differently when compiled
+            case Token.ASSIGN:
+            case Token.ASSIGN_ADD:
+            case Token.ASSIGN_SUB:
+            case Token.ASSIGN_MUL:
+            case Token.ASSIGN_DIV:
+            case Token.ASSIGN_MOD:
+            case Token.ASSIGN_BITOR:
+            case Token.ASSIGN_BITXOR:
+            case Token.ASSIGN_BITAND:
+            case Token.ASSIGN_LSH:
+            case Token.ASSIGN_RSH:
+            case Token.ASSIGN_URSH:
+                // In strict mode, assignments can have different semantics (ReferenceError for
+                // undeclared vars)
+                // Compilation might change this behavior, so disable compilation for strict mode
+                // functions
+                if (itsInFunctionFlag && itsData.isStrict) {
+                    itsData.usesConstructionsThatCantBeCompiledInChunk = true;
+                }
+                break;
+
+            // Arrow functions might have 'this' binding issues during compilation
+            case Token.ARROW:
+                itsData.usesConstructionsThatCantBeCompiledInChunk = true;
+                break;
+
+            // Tagged template literals might have caching issues
+            case Token.TAGGED_TEMPLATE_LITERAL:
+                itsData.usesConstructionsThatCantBeCompiledInChunk = true;
+                break;
+
             case Token.FUNCTION:
                 // Check if this is a named function expression that references itself
                 if (node != null) {
@@ -321,9 +372,15 @@ class CodeGenerator extends Icode {
                     FunctionNode fn = scriptOrFn.getFunctionNode(fnIndex);
                     if (fn.getFunctionType() == FunctionNode.FUNCTION_EXPRESSION
                             && fn.getName() != null
-                            && !fn.getName().isEmpty()
-                            && hasSelfReference(fn, fn.getName())) {
-                        itsData.usesConstructionsThatCantBeCompiledInChunk = true;
+                            && !fn.getName().isEmpty()) {
+                        // If it has self-references, definitely don't compile
+                        if (hasSelfReference(fn, fn.getName())) {
+                            itsData.usesConstructionsThatCantBeCompiledInChunk = true;
+                        }
+                        // Additionally, if it's in strict mode, be conservative
+                        else if (itsData.isStrict) {
+                            itsData.usesConstructionsThatCantBeCompiledInChunk = true;
+                        }
                     }
                 }
                 break;
@@ -1957,6 +2014,14 @@ class CodeGenerator extends Icode {
     private void releaseLocal(int localSlot) {
         --localTop;
         if (localSlot != localTop) Kit.codeBug();
+    }
+
+    /** Get the name of the current function being processed, or null if not in a function */
+    private String getCurrentFunctionName() {
+        if (scriptOrFn instanceof FunctionNode) {
+            return ((FunctionNode) scriptOrFn).getName();
+        }
+        return null;
     }
 
     private static final class CompleteOptionalCallJump {
