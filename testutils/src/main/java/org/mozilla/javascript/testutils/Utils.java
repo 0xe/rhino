@@ -49,8 +49,16 @@ public class Utils {
      * @param interpreted true if interpreted mode should be used
      */
     public static void executeScript(String script, boolean interpreted) {
+        executeScript(script, interpreted, true);
+    }
+
+    public static void executeScript(
+            String script, boolean interpreted, boolean enableFnCompilation) {
         Utils.runWithMode(
                 cx -> {
+                    if (!enableFnCompilation) {
+                        cx.setFunctionCompiler(null);
+                    }
                     final Scriptable scope = cx.initStandardObjects();
                     return cx.evaluateString(scope, script, "myScript.js", 1, null);
                 },

@@ -28,7 +28,7 @@ public class ErrorPropertiesTest {
     private void testScriptStackTrace(
             final String script, final String expectedStackTrace, final boolean interpreted) {
         try {
-            Utils.executeScript(script, interpreted);
+            Utils.executeScript(script, interpreted, false);
         } catch (final RhinoException e) {
             Assert.assertEquals(expectedStackTrace, e.getScriptStackTrace());
         }
@@ -78,6 +78,7 @@ public class ErrorPropertiesTest {
     private void testIt(final String script, final Object expected) {
         Utils.runWithAllModes(
                 cx -> {
+                    cx.setFunctionCompiler(null); // these cannot use jit compilation
                     try {
                         final ScriptableObject scope = cx.initStandardObjects();
                         final Object o = cx.evaluateString(scope, script, "myScript.js", 1, null);

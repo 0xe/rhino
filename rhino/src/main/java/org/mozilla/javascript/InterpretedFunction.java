@@ -130,7 +130,8 @@ final class InterpretedFunction extends NativeFunction implements Script {
         // (continuations require interpreted execution to maintain interpreter state as
         // continuation state is stored differently between the implementations..)
         if (compiledFunction != null && !cx.isContinuationsTopCall) {
-            return compiledFunction.call(cx, scope, thisObj, args);
+            Object result = compiledFunction.call(cx, scope, thisObj, args);
+            return result;
         }
 
         if (!ScriptRuntime.hasTopCall(cx)) {

@@ -2923,10 +2923,7 @@ public final class Interpreter extends Icode implements Evaluator {
             }
         }
 
-        if (cx.hasFeature(Context.FEATURE_FUNCTION_COMPILATION)
-                && fun instanceof InterpretedFunction
-                && !cx.isContinuationsTopCall
-                && !((InterpretedFunction) fun).idata.itsNeedsActivation) {
+        if (fun instanceof InterpretedFunction) {
             InterpretedFunction ifun = (InterpretedFunction) fun;
             // Increment the call count
             ifun.invocationCount++;
@@ -2944,7 +2941,10 @@ public final class Interpreter extends Icode implements Evaluator {
                 return new ContinueLoop(frame, stackTop, indexReg);
             }
 
-            if (ifun.shouldCompile(cx)) {
+            if (cx.hasFeature(Context.FEATURE_FUNCTION_COMPILATION)
+                    && !cx.isContinuationsTopCall
+                    && ifun.shouldCompile(cx)
+                    && !((InterpretedFunction) fun).idata.itsNeedsActivation) {
                 // Check if function compilation is enabled and if this function should be compiled
                 // Try to compile the function
                 if (!ifun.isCompiled()) {

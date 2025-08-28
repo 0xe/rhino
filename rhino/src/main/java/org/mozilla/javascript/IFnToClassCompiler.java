@@ -34,9 +34,17 @@ public class IFnToClassCompiler implements Context.FunctionCompiler {
             String className = "CompiledFunction" + counter.getAndIncrement();
             String fullClassName = "org.mozilla.javascript.compiled." + className;
 
+            // For named function expressions, we need to bind the function name in its own scope
+            String sourceToCompile = ifun.getRawSource();
+            String functionName = ifun.getFunctionName();
+            if (functionName != null && !functionName.isEmpty()) {
+                // Wrap the function source to properly bind the function name in its scope
+                sourceToCompile = createNamedFunctionWrapper(sourceToCompile, functionName);
+            }
+
             Object[] results =
                     compiler.compileToClassFiles(
-                            ifun.getRawSource(),
+                            sourceToCompile,
                             idata.itsSourceFile,
                             0, // TODO
                             fullClassName,
@@ -70,10 +78,9 @@ public class IFnToClassCompiler implements Context.FunctionCompiler {
             compiledFunction.setPrototypeProperty(ifun.getPrototypeProperty());
             compiledFunction.setHomeObject(ifun.getHomeObject());
 
-            // Transfer function name from the interpreted function
-            String functionName = ifun.getFunctionName();
+            // Set the function name property (but not scope binding, which is handled during
+            // compilation)
             if (functionName != null && !functionName.isEmpty()) {
-                // Set the name property using the internal name setter mechanism
                 compiledFunction.put("name", compiledFunction, functionName);
             }
 
@@ -86,5 +93,28 @@ public class IFnToClassCompiler implements Context.FunctionCompiler {
             Context.reportError("Error compiling function: " + err);
             return null;
         }
+    }
+
+    /**
+     * Creates a wrapper that properly binds the function name in its own scope. For a named
+     * function expression like "function g() { return g; }", this creates a wrapper that ensures
+     * 'g' refers to the function itself.
+     */
+    private String createNamedFunctionWrapper(String originalSource, String functionName) {
+        // For named function expressions, we need to create a scope where the function name
+        // is bound to the function itself. We do this by creating an IIFE that assigns
+        // the function to a variable with the function's name.
+
+        // Example transformation:
+        // Original: "function g() { return g.toString() }"
+        // Wrapped:  "(function() { var g = function g() { return g.toString() }; return g; })()"
+
+        return "(function() { var "
+                + functionName
+                + " = "
+                + originalSource
+                + "; return "
+                + functionName
+                + "; })()";
     }
 }
