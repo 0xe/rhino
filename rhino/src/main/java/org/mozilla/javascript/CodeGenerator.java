@@ -360,8 +360,9 @@ class CodeGenerator extends Icode {
                 itsData.usesConstructionsThatCantBeCompiledInChunk = true;
                 break;
 
-            // Tagged template literals might have caching issues
+            // Template literals have caching issues with JIT compilation
             case Token.TAGGED_TEMPLATE_LITERAL:
+            case Token.TEMPLATE_LITERAL:
                 itsData.usesConstructionsThatCantBeCompiledInChunk = true;
                 break;
 
