@@ -2457,7 +2457,8 @@ public class Context implements Closeable {
 
     // TODO: default function compiler
     //    FunctionCompiler functionCompiler = null;
-    FunctionCompiler functionCompiler = new IFnToClassCompiler();
+    //    FunctionCompiler functionCompiler = new IFnToClassCompiler();
+    FunctionCompiler functionCompiler = new BytecodeToClassCompiler();
 
     /** Interface for compiling interpreted functions to optimized bytecode. */
     public interface FunctionCompiler {
@@ -2505,7 +2506,8 @@ public class Context implements Closeable {
     }
 
     // Function compilation threshold
-    private int functionCompilationThreshold = 5; // Default threshold
+    //    private int functionCompilationThreshold = 5; // Default threshold
+    private int functionCompilationThreshold = 0; // Default threshold
 
     /**
      * Gets the invocation threshold after which functions will be considered for compilation.
