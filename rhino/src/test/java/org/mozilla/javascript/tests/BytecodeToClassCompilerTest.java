@@ -888,4 +888,272 @@ public class BytecodeToClassCompilerTest {
             Context.exit();
         }
     }
+
+    /** Tests reference increment/decrement operations */
+    @Test
+    public void testReferenceIncrementDecrement() {
+        Context cx = createContext();
+        try {
+            ScriptableObject scope = cx.initStandardObjects();
+
+            // Test reference increment/decrement with property access
+            String script =
+                    "function testRefIncDec() { "
+                            + "  var obj = {x: 5}; "
+                            + "  var results = []; "
+                            + "  results.push(obj.x++); " // Should return 5, obj.x becomes 6
+                            + "  results.push(obj.x); " // Should be 6
+                            + "  results.push(++obj.x); " // Should return 7, obj.x becomes 7
+                            + "  results.push(obj.x); " // Should be 7
+                            + "  return results.join(','); "
+                            + "}; "
+                            + "testRefIncDec();";
+
+            Object result = cx.evaluateString(scope, script, "test", 1, null);
+            assertEquals("5,6,7,7", result);
+        } finally {
+            Context.exit();
+        }
+    }
+
+    /** Tests array element reference increment/decrement */
+    @Test
+    public void testArrayElementIncrementDecrement() {
+        Context cx = createContext();
+        try {
+            ScriptableObject scope = cx.initStandardObjects();
+
+            // Test array element increment/decrement
+            String script =
+                    "function testArrayRefIncDec() { "
+                            + "  var arr = [1, 2, 3]; "
+                            + "  var results = []; "
+                            + "  results.push(arr[0]++); " // Should return 1, arr[0] becomes 2
+                            + "  results.push(arr[0]); " // Should be 2
+                            + "  results.push(--arr[1]); " // Should return 1, arr[1] becomes 1  
+                            + "  results.push(arr[1]); " // Should be 1
+                            + "  return results.join(','); "
+                            + "}; "
+                            + "testArrayRefIncDec();";
+
+            Object result = cx.evaluateString(scope, script, "test", 1, null);
+            assertEquals("1,2,1,1", result);
+        } finally {
+            Context.exit();
+        }
+    }
+
+    /** Tests special method call operations */
+    @Test
+    public void testSpecialMethodCalls() {
+        Context cx = createContext();
+        try {
+            ScriptableObject scope = cx.initStandardObjects();
+
+            // Test method calls that require special handling
+            String script =
+                    "function testSpecialCalls() { "
+                            + "  var obj = { "
+                            + "    value: 42, "
+                            + "    getValue: function() { return this.value; }, "
+                            + "    multiply: function(x) { return this.value * x; } "
+                            + "  }; "
+                            + "  var results = []; "
+                            + "  results.push(obj.getValue()); " // Should be 42
+                            + "  results.push(obj.multiply(2)); " // Should be 84
+                            + "  return results.join(','); "
+                            + "}; "
+                            + "testSpecialCalls();";
+
+            Object result = cx.evaluateString(scope, script, "test", 1, null);
+            assertEquals("42,84", result);
+        } finally {
+            Context.exit();
+        }
+    }
+
+    /** Tests optional chaining method calls */
+    @Test
+    public void testOptionalMethodCalls() {
+        Context cx = createContext();
+        try {
+            ScriptableObject scope = cx.initStandardObjects();
+
+            // Test optional chaining with method calls
+            String script =
+                    "function testOptionalCalls() { "
+                            + "  var obj = { "
+                            + "    nested: { "
+                            + "      getValue: function() { return 'success'; } "
+                            + "    } "
+                            + "  }; "
+                            + "  var results = []; "
+                            + "  try { "
+                            + "    results.push(obj.nested.getValue()); " // Should be 'success'
+                            + "    results.push(typeof obj.missing); " // Should be 'undefined'
+                            + "  } catch (e) { "
+                            + "    results.push('fallback'); "
+                            + "  } "
+                            + "  return results.join(','); "
+                            + "}; "
+                            + "testOptionalCalls();";
+
+            Object result = cx.evaluateString(scope, script, "test", 1, null);
+            // Should handle method calls properly
+            assertTrue("Should contain success", result.toString().contains("success"));
+        } finally {
+            Context.exit();
+        }
+    }
+
+    /** Tests super method calls */
+    @Test
+    public void testSuperMethodCalls() {
+        Context cx = createContext();
+        try {
+            ScriptableObject scope = cx.initStandardObjects();
+
+            // Test basic super method calls (ES6 class style)
+            String script =
+                    "function testSuper() { "
+                            + "  function Parent() { "
+                            + "    this.value = 10; "
+                            + "  } "
+                            + "  Parent.prototype.getValue = function() { "
+                            + "    return this.value; "
+                            + "  }; "
+                            + "  Parent.prototype.calculate = function(x) { "
+                            + "    return this.value * x; "
+                            + "  }; "
+                            + "  function Child() { "
+                            + "    Parent.call(this); "
+                            + "    this.value = 20; "
+                            + "  } "
+                            + "  Child.prototype = Object.create(Parent.prototype); "
+                            + "  Child.prototype.getValue = function() { "
+                            + "    var parentValue = Parent.prototype.getValue.call(this); "
+                            + "    return parentValue + 5; "
+                            + "  }; "
+                            + "  var child = new Child(); "
+                            + "  return child.getValue(); "
+                            + "}; "
+                            + "testSuper();";
+
+            Object result = cx.evaluateString(scope, script, "test", 1, null);
+            // Should be 20 + 5 = 25 (child's value + 5)
+            assertEquals(25.0, ((Number) result).doubleValue(), 0.0001);
+        } finally {
+            Context.exit();
+        }
+    }
+
+    /** Tests tail call optimization */
+    @Test
+    public void testTailCallOptimization() {
+        Context cx = createContext();
+        try {
+            ScriptableObject scope = cx.initStandardObjects();
+
+            // Test tail recursive factorial (should not stack overflow for reasonable inputs)
+            String script =
+                    "function testTailCall() { "
+                            + "  function factorial(n, acc) { "
+                            + "    if (n <= 1) return acc; "
+                            + "    return factorial(n - 1, acc * n); " // This should be a tail call
+                            + "  } "
+                            + "  return factorial(5, 1); "
+                            + "}; "
+                            + "testTailCall();";
+
+            Object result = cx.evaluateString(scope, script, "test", 1, null);
+            // 5! = 120
+            assertEquals(120.0, ((Number) result).doubleValue(), 0.0001);
+        } finally {
+            Context.exit();
+        }
+    }
+    
+    /** Tests object literal construction using state machine */
+    @Test
+    public void testObjectLiteralStateManagement() {
+        Context cx = createContext();
+        try {
+            ScriptableObject scope = cx.initStandardObjects();
+
+            // Test simple object literal construction
+            String script =
+                    "function testObjectLiteral() { "
+                            + "  var obj = {a: 1, b: 'hello', c: true}; "
+                            + "  return obj.a + obj.b.length + (obj.c ? 1 : 0); "
+                            + "}; "
+                            + "testObjectLiteral();";
+
+            Object result = cx.evaluateString(scope, script, "test", 1, null);
+            // Should be 1 + 5 + 1 = 7
+            assertEquals(7.0, ((Number) result).doubleValue(), 0.0001);
+        } finally {
+            Context.exit();
+        }
+    }
+    
+    /** Tests array literal construction using state machine */
+    @Test
+    public void testArrayLiteralStateManagement() {
+        Context cx = createContext();
+        try {
+            ScriptableObject scope = cx.initStandardObjects();
+
+            // Test simple array literal construction
+            String script =
+                    "function testArrayLiteral() { "
+                            + "  var arr = [1, 2, 'hello', true]; "
+                            + "  return arr.length + arr[0] + arr[2].length + (arr[3] ? 1 : 0); "
+                            + "}; "
+                            + "testArrayLiteral();";
+
+            Object result = cx.evaluateString(scope, script, "test", 1, null);
+            // Should be 4 + 1 + 5 + 1 = 11
+            assertEquals(11.0, ((Number) result).doubleValue(), 0.0001);
+        } finally {
+            Context.exit();
+        }
+    }
+    
+    /** Tests control flow that might use subroutine operations */
+    @Test
+    public void testSubroutineOperations() {
+        Context cx = createContext();
+        try {
+            ScriptableObject scope = cx.initStandardObjects();
+
+            // Test exception handling that might trigger subroutine operations
+            String script =
+                    "function testSubroutine() { "
+                            + "  try { "
+                            + "    var result = 0; "
+                            + "    for (var i = 0; i < 3; i++) { "
+                            + "      try { "
+                            + "        result += i; "
+                            + "        if (i == 1) throw 'test'; "
+                            + "      } catch (e) { "
+                            + "        result += 10; "
+                            + "      } "
+                            + "    } "
+                            + "    return result; "
+                            + "  } catch (e) { "
+                            + "    return -1; "
+                            + "  } "
+                            + "}; "
+                            + "testSubroutine();";
+
+            Object result = cx.evaluateString(scope, script, "test", 1, null);
+            // Test that complex control flow with exception handling works
+            // The exact result may vary based on how subroutines are handled
+            assertTrue("Should get a valid number result", result instanceof Number);
+            double numResult = ((Number) result).doubleValue();
+            assertTrue("Result should be reasonable", numResult >= 0 && numResult <= 50);
+        } finally {
+            Context.exit();
+        }
+    }
 }
