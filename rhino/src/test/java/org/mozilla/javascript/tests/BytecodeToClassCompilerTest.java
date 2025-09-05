@@ -930,7 +930,7 @@ public class BytecodeToClassCompilerTest {
                             + "  var results = []; "
                             + "  results.push(arr[0]++); " // Should return 1, arr[0] becomes 2
                             + "  results.push(arr[0]); " // Should be 2
-                            + "  results.push(--arr[1]); " // Should return 1, arr[1] becomes 1  
+                            + "  results.push(--arr[1]); " // Should return 1, arr[1] becomes 1
                             + "  results.push(arr[1]); " // Should be 1
                             + "  return results.join(','); "
                             + "}; "
@@ -1072,7 +1072,7 @@ public class BytecodeToClassCompilerTest {
             Context.exit();
         }
     }
-    
+
     /** Tests object literal construction using state machine */
     @Test
     public void testObjectLiteralStateManagement() {
@@ -1095,7 +1095,7 @@ public class BytecodeToClassCompilerTest {
             Context.exit();
         }
     }
-    
+
     /** Tests array literal construction using state machine */
     @Test
     public void testArrayLiteralStateManagement() {
@@ -1118,7 +1118,7 @@ public class BytecodeToClassCompilerTest {
             Context.exit();
         }
     }
-    
+
     /** Tests control flow that might use subroutine operations */
     @Test
     public void testSubroutineOperations() {
