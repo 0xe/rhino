@@ -188,10 +188,7 @@ public class BytecodeToClassCompiler implements Context.FunctionCompiler {
             ClassFileWriter cfw =
                     new ClassFileWriter(className, SUPER_CLASS_NAME, idata.itsSourceFile);
 
-            cfw.startMethod(
-                    "<init>",
-                    "()V",
-                    ACC_PUBLIC);
+            cfw.startMethod("<init>", "()V", ACC_PUBLIC);
             cfw.addALoad(0); // this
             cfw.addInvoke(ByteCode.INVOKESPECIAL, SUPER_CLASS_NAME, "<init>", "()V");
             cfw.add(ByteCode.RETURN);
@@ -1029,7 +1026,8 @@ public class BytecodeToClassCompiler implements Context.FunctionCompiler {
 
                     case Icode_TEMPLATE_LITERAL_CALLSITE:
                         {
-                            // Template literal call site - for now throw UnsupportedOperationException
+                            // Template literal call site - for now throw
+                            // UnsupportedOperationException
                             // TODO: Implement by inlining template literal data at compile time
                             cfw.add(ByteCode.NEW, "java/lang/UnsupportedOperationException");
                             cfw.add(ByteCode.DUP);
@@ -1545,6 +1543,21 @@ public class BytecodeToClassCompiler implements Context.FunctionCompiler {
                                 "(Ljava/lang/Object;Ljava/lang/Object;[Ljava/lang/Object;Lorg/mozilla/javascript/Context;Lorg/mozilla/javascript/Scriptable;)Lorg/mozilla/javascript/Ref;");
                         break;
 
+                    case Token.REF_SPECIAL:
+                        // Create a reference to a special property (like __proto__)
+                        // Stack: object -> Ref
+                        // Uses string register for property name
+                        cfw.addALoad(stringRegLocal); // object, specialProperty
+                        cfw.addALoad(contextLocal); // object, specialProperty, context
+                        cfw.addALoad(scopeLocal); // object, specialProperty, context, scope
+                        cfw.addInvoke(
+                                ByteCode.INVOKESTATIC,
+                                "org/mozilla/javascript/ScriptRuntime",
+                                "specialRef",
+                                "(Ljava/lang/Object;Ljava/lang/String;Lorg/mozilla/javascript/Context;Lorg/mozilla/javascript/Scriptable;)Lorg/mozilla/javascript/Ref;");
+                        pc++;
+                        break;
+
                     // Name operations
                     case Token.NAME:
                         // Name reference - uses string register
@@ -1963,7 +1976,8 @@ public class BytecodeToClassCompiler implements Context.FunctionCompiler {
                         break;
 
                     case Icode_REG_STR2:
-                        // Load strings[getIndex(iCode, pc)] into stringReg - inline the value at compile time
+                        // Load strings[getIndex(iCode, pc)] into stringReg - inline the value at
+                        // compile time
                         varIndex =
                                 (idata.itsICode[pc] & 0xFF)
                                         | ((idata.itsICode[pc + 1] & 0xFF) << 8);
@@ -1974,7 +1988,8 @@ public class BytecodeToClassCompiler implements Context.FunctionCompiler {
                         break;
 
                     case Icode_REG_STR4:
-                        // Load strings[getInt(iCode, pc)] into stringReg - inline the value at compile time
+                        // Load strings[getInt(iCode, pc)] into stringReg - inline the value at
+                        // compile time
                         varIndex =
                                 (idata.itsICode[pc] & 0xFF)
                                         | ((idata.itsICode[pc + 1] & 0xFF) << 8)
@@ -2066,7 +2081,8 @@ public class BytecodeToClassCompiler implements Context.FunctionCompiler {
                     case Icode_REG_BIGINT1:
                         // Load bigInts[pc] as a BigInteger object - inline at compile time
                         varIndex = idata.itsICode[pc++] & 0xFF;
-                        if (idata.itsBigIntTable != null && varIndex < idata.itsBigIntTable.length) {
+                        if (idata.itsBigIntTable != null
+                                && varIndex < idata.itsBigIntTable.length) {
                             java.math.BigInteger bigIntValue = idata.itsBigIntTable[varIndex];
                             cfw.add(ByteCode.NEW, "java/math/BigInteger");
                             cfw.add(ByteCode.DUP);
@@ -2081,16 +2097,16 @@ public class BytecodeToClassCompiler implements Context.FunctionCompiler {
                             cfw.add(ByteCode.ACONST_NULL);
                             cfw.addAStore(bigIntRegLocal);
                         }
-                        cfw.add(ByteCode.AALOAD);
-                        cfw.addAStore(bigIntRegLocal);
                         break;
                     case Icode_REG_BIGINT2:
-                        // Load bigInts[getIndex(iCode, pc)] as a BigInteger object - inline at compile time
+                        // Load bigInts[getIndex(iCode, pc)] as a BigInteger object - inline at
+                        // compile time
                         varIndex =
                                 (idata.itsICode[pc] & 0xFF)
                                         | ((idata.itsICode[pc + 1] & 0xFF) << 8);
                         pc += 2;
-                        if (idata.itsBigIntTable != null && varIndex < idata.itsBigIntTable.length) {
+                        if (idata.itsBigIntTable != null
+                                && varIndex < idata.itsBigIntTable.length) {
                             java.math.BigInteger bigInt2 = idata.itsBigIntTable[varIndex];
                             cfw.add(ByteCode.NEW, "java/math/BigInteger");
                             cfw.add(ByteCode.DUP);
@@ -2107,14 +2123,16 @@ public class BytecodeToClassCompiler implements Context.FunctionCompiler {
                         }
                         break;
                     case Icode_REG_BIGINT4:
-                        // Load bigInts[getInt(iCode, pc)] as a BigInteger object - inline at compile time
+                        // Load bigInts[getInt(iCode, pc)] as a BigInteger object - inline at
+                        // compile time
                         varIndex =
                                 (idata.itsICode[pc] & 0xFF)
                                         | ((idata.itsICode[pc + 1] & 0xFF) << 8)
                                         | ((idata.itsICode[pc + 2] & 0xFF) << 16)
                                         | ((idata.itsICode[pc + 3] & 0xFF) << 24);
                         pc += 4;
-                        if (idata.itsBigIntTable != null && varIndex < idata.itsBigIntTable.length) {
+                        if (idata.itsBigIntTable != null
+                                && varIndex < idata.itsBigIntTable.length) {
                             java.math.BigInteger bigInt4 = idata.itsBigIntTable[varIndex];
                             cfw.add(ByteCode.NEW, "java/math/BigInteger");
                             cfw.add(ByteCode.DUP);
@@ -2824,12 +2842,10 @@ public class BytecodeToClassCompiler implements Context.FunctionCompiler {
             Class<?> clazz = loader.loadClass(className);
 
             // No need to set static field - all values were inlined at compile time
-            
+
             // Create a new instance of the compiled function
-            java.lang.reflect.Constructor<?> constructor =
-                    clazz.getConstructor();
-            NativeFunction compiledFunction =
-                    (NativeFunction) constructor.newInstance();
+            java.lang.reflect.Constructor<?> constructor = clazz.getConstructor();
+            NativeFunction compiledFunction = (NativeFunction) constructor.newInstance();
 
             // Set function properties to match IFnToClassCompiler behavior
             compiledFunction.setPrototypeProperty(ifun.getPrototypeProperty());
