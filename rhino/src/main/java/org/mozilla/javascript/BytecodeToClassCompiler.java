@@ -188,17 +188,16 @@ public class BytecodeToClassCompiler implements Context.FunctionCompiler {
             ClassFileWriter cfw =
                     new ClassFileWriter(className, SUPER_CLASS_NAME, idata.itsSourceFile);
 
-            // Add constructor matching IFnToClassCompiler pattern
             cfw.startMethod(
                     "<init>",
-                    "(Lorg/mozilla/javascript/Scriptable;Lorg/mozilla/javascript/Context;I)V",
+                    "()V",
                     ACC_PUBLIC);
             cfw.addALoad(0); // this
             cfw.addInvoke(ByteCode.INVOKESPECIAL, SUPER_CLASS_NAME, "<init>", "()V");
             cfw.add(ByteCode.RETURN);
-            cfw.stopMethod((short) 4);
+            cfw.stopMethod((short) 1);
 
-            // Generate the class file from interpreter bytecode
+            // Generate the standard call method that NativeFunction expects
             cfw.startMethod(
                     "call",
                     "(Lorg/mozilla/javascript/Context;Lorg/mozilla/javascript/Scriptable;Lorg/mozilla/javascript/Scriptable;[Ljava/lang/Object;)Ljava/lang/Object;",
@@ -1030,40 +1029,18 @@ public class BytecodeToClassCompiler implements Context.FunctionCompiler {
 
                     case Icode_TEMPLATE_LITERAL_CALLSITE:
                         {
-                            // Template literal call site - Push template literal call site object
-                            // indexReg contains the template literal index
-                            cfw.addALoad(contextLocal); // context
-                            cfw.addALoad(scopeLocal); // context, scope
-
-                            // Load the template literals array
-                            cfw.addALoad(0); // context, scope, this
-                            cfw.add(
-                                    ByteCode.GETFIELD,
-                                    className,
-                                    "idata",
-                                    "Lorg/mozilla/javascript/InterpreterData;");
-                            cfw.add(
-                                    ByteCode.GETFIELD,
-                                    "org/mozilla/javascript/InterpreterData",
-                                    "itsTemplateLiterals",
-                                    "[Ljava/lang/Object;"); // context, scope, templateLiterals
-
-                            // Load the index register value
-                            cfw.addALoad(
-                                    indexRegLocal); // context, scope, templateLiterals, indexReg
+                            // Template literal call site - for now throw UnsupportedOperationException
+                            // TODO: Implement by inlining template literal data at compile time
+                            cfw.add(ByteCode.NEW, "java/lang/UnsupportedOperationException");
+                            cfw.add(ByteCode.DUP);
+                            cfw.addLoadConstant(
+                                    "Template literal call sites not yet supported in BytecodeToClassCompiler");
                             cfw.addInvoke(
-                                    ByteCode.INVOKESTATIC,
-                                    "java/lang/Integer",
-                                    "intValue",
-                                    "()I"); // context, scope, templateLiterals, indexReg_int
-
-                            // Call ScriptRuntime.getTemplateLiteralCallSite
-                            cfw.addInvoke(
-                                    ByteCode.INVOKESTATIC,
-                                    "org/mozilla/javascript/ScriptRuntime",
-                                    "getTemplateLiteralCallSite",
-                                    "(Lorg/mozilla/javascript/Context;Lorg/mozilla/javascript/Scriptable;[Ljava/lang/Object;I)Ljava/lang/Object;");
-                            // Result: template literal call site object on stack
+                                    ByteCode.INVOKESPECIAL,
+                                    "java/lang/UnsupportedOperationException",
+                                    "<init>",
+                                    "(Ljava/lang/String;)V");
+                            cfw.add(ByteCode.ATHROW);
                         }
                         break;
 
@@ -1837,30 +1814,19 @@ public class BytecodeToClassCompiler implements Context.FunctionCompiler {
                     // Regular expression literals
                     case Token.REGEXP:
                         // Stack: -> regexp_object
-                        // Create a RegExp object from precompiled pattern
+                        // For now throw UnsupportedOperationException
+                        // TODO: Implement by inlining regex literal data at compile time
                         varIndex = idata.itsICode[pc++] & 0xFF;
-
-                        cfw.addALoad(contextLocal);
-                        cfw.addALoad(scopeLocal);
-                        // Access the regexp data from the InterpreterData at runtime
-                        cfw.addALoad(0); // Load 'this'
-                        cfw.add(
-                                ByteCode.GETFIELD,
-                                className,
-                                "idata",
-                                "Lorg/mozilla/javascript/InterpreterData;");
-                        cfw.add(
-                                ByteCode.GETFIELD,
-                                "org/mozilla/javascript/InterpreterData",
-                                "itsRegExpLiterals",
-                                "[Ljava/lang/Object;");
-                        cfw.addPush(varIndex);
-                        cfw.add(ByteCode.AALOAD);
+                        cfw.add(ByteCode.NEW, "java/lang/UnsupportedOperationException");
+                        cfw.add(ByteCode.DUP);
+                        cfw.addLoadConstant(
+                                "Regular expression literals not yet supported in BytecodeToClassCompiler");
                         cfw.addInvoke(
-                                ByteCode.INVOKESTATIC,
-                                "org/mozilla/javascript/ScriptRuntime",
-                                "wrapRegExp",
-                                "(Lorg/mozilla/javascript/Context;Lorg/mozilla/javascript/Scriptable;Ljava/lang/Object;)Lorg/mozilla/javascript/Scriptable;");
+                                ByteCode.INVOKESPECIAL,
+                                "java/lang/UnsupportedOperationException",
+                                "<init>",
+                                "(Ljava/lang/String;)V");
+                        cfw.add(ByteCode.ATHROW);
                         break;
 
                     // BigInt literals
@@ -1957,280 +1923,212 @@ public class BytecodeToClassCompiler implements Context.FunctionCompiler {
 
                     // String register operations - load string literals into register
                     case Icode_REG_STR_C0:
-                        // Load strings[0] into stringReg
-                        cfw.addALoad(0); // Load 'this'
-                        cfw.add(
-                                ByteCode.GETFIELD,
-                                className,
-                                "idata",
-                                "Lorg/mozilla/javascript/InterpreterData;");
-                        cfw.add(
-                                ByteCode.GETFIELD,
-                                "org/mozilla/javascript/InterpreterData",
-                                "itsStringTable",
-                                "[Ljava/lang/String;");
-                        cfw.addPush(0);
-                        cfw.add(ByteCode.AALOAD);
+                        // Load strings[0] into stringReg - inline the value at compile time
+                        String str0 = idata.itsStringTable[0];
+                        cfw.addPush(str0);
                         cfw.addAStore(stringRegLocal);
                         pc++;
                         break;
 
                     case Icode_REG_STR_C1:
-                        // Load strings[1] into stringReg
-                        cfw.addALoad(0); // Load 'this'
-                        cfw.add(
-                                ByteCode.GETFIELD,
-                                className,
-                                "idata",
-                                "Lorg/mozilla/javascript/InterpreterData;");
-                        cfw.add(
-                                ByteCode.GETFIELD,
-                                "org/mozilla/javascript/InterpreterData",
-                                "itsStringTable",
-                                "[Ljava/lang/String;");
-                        cfw.addPush(1);
-                        cfw.add(ByteCode.AALOAD);
+                        // Load strings[1] into stringReg - inline the value at compile time
+                        String str1 = idata.itsStringTable[1];
+                        cfw.addPush(str1);
                         cfw.addAStore(stringRegLocal);
                         pc++;
                         break;
 
                     case Icode_REG_STR_C2:
-                        // Load strings[2] into stringReg
-                        cfw.addALoad(0); // Load 'this'
-                        cfw.add(
-                                ByteCode.GETFIELD,
-                                className,
-                                "idata",
-                                "Lorg/mozilla/javascript/InterpreterData;");
-                        cfw.add(
-                                ByteCode.GETFIELD,
-                                "org/mozilla/javascript/InterpreterData",
-                                "itsStringTable",
-                                "[Ljava/lang/String;");
-                        cfw.addPush(2);
-                        cfw.add(ByteCode.AALOAD);
+                        // Load strings[2] into stringReg - inline the value at compile time
+                        String str2 = idata.itsStringTable[2];
+                        cfw.addPush(str2);
                         cfw.addAStore(stringRegLocal);
                         pc++;
                         break;
 
                     case Icode_REG_STR_C3:
-                        // Load strings[3] into stringReg
-                        cfw.addALoad(0); // Load 'this'
-                        cfw.add(
-                                ByteCode.GETFIELD,
-                                className,
-                                "idata",
-                                "Lorg/mozilla/javascript/InterpreterData;");
-                        cfw.add(
-                                ByteCode.GETFIELD,
-                                "org/mozilla/javascript/InterpreterData",
-                                "itsStringTable",
-                                "[Ljava/lang/String;");
-                        cfw.addPush(3);
-                        cfw.add(ByteCode.AALOAD);
+                        // Load strings[3] into stringReg - inline the value at compile time
+                        String str3 = idata.itsStringTable[3];
+                        cfw.addPush(str3);
                         cfw.addAStore(stringRegLocal);
                         pc++;
                         break;
 
                     case Icode_REG_STR1:
-                        // Load strings[pc] into stringReg
+                        // Load strings[pc] into stringReg - inline the value at compile time
                         varIndex = idata.itsICode[pc++] & 0xFF;
-                        cfw.addALoad(0); // Load 'this'
-                        cfw.add(
-                                ByteCode.GETFIELD,
-                                className,
-                                "idata",
-                                "Lorg/mozilla/javascript/InterpreterData;");
-                        cfw.add(
-                                ByteCode.GETFIELD,
-                                "org/mozilla/javascript/InterpreterData",
-                                "itsStringTable",
-                                "[Ljava/lang/String;");
-                        cfw.addPush(varIndex);
-                        cfw.add(ByteCode.AALOAD);
+                        String strValue = idata.itsStringTable[varIndex];
+                        cfw.addPush(strValue);
                         cfw.addAStore(stringRegLocal);
                         break;
 
                     case Icode_REG_STR2:
-                        // Load strings[getIndex(iCode, pc)] into stringReg
+                        // Load strings[getIndex(iCode, pc)] into stringReg - inline the value at compile time
                         varIndex =
                                 (idata.itsICode[pc] & 0xFF)
                                         | ((idata.itsICode[pc + 1] & 0xFF) << 8);
                         pc += 2;
-                        cfw.addALoad(0); // Load 'this'
-                        cfw.add(
-                                ByteCode.GETFIELD,
-                                className,
-                                "idata",
-                                "Lorg/mozilla/javascript/InterpreterData;");
-                        cfw.add(
-                                ByteCode.GETFIELD,
-                                "org/mozilla/javascript/InterpreterData",
-                                "itsStringTable",
-                                "[Ljava/lang/String;");
-                        cfw.addPush(varIndex);
-                        cfw.add(ByteCode.AALOAD);
+                        String str2Value = idata.itsStringTable[varIndex];
+                        cfw.addPush(str2Value);
                         cfw.addAStore(stringRegLocal);
                         break;
 
                     case Icode_REG_STR4:
-                        // Load strings[getInt(iCode, pc)] into stringReg
+                        // Load strings[getInt(iCode, pc)] into stringReg - inline the value at compile time
                         varIndex =
                                 (idata.itsICode[pc] & 0xFF)
                                         | ((idata.itsICode[pc + 1] & 0xFF) << 8)
                                         | ((idata.itsICode[pc + 2] & 0xFF) << 16)
                                         | ((idata.itsICode[pc + 3] & 0xFF) << 24);
                         pc += 4;
-                        cfw.addALoad(0); // Load 'this'
-                        cfw.add(
-                                ByteCode.GETFIELD,
-                                className,
-                                "idata",
-                                "Lorg/mozilla/javascript/InterpreterData;");
-                        cfw.add(
-                                ByteCode.GETFIELD,
-                                "org/mozilla/javascript/InterpreterData",
-                                "itsStringTable",
-                                "[Ljava/lang/String;");
-                        cfw.addPush(varIndex);
-                        cfw.add(ByteCode.AALOAD);
+                        String str4Value = idata.itsStringTable[varIndex];
+                        cfw.addPush(str4Value);
                         cfw.addAStore(stringRegLocal);
                         break;
 
                     // BigInt register operations - load BigInt values into register
                     case Icode_REG_BIGINT_C0:
-                        // Load bigInts[0] as a BigInteger object
-                        cfw.addALoad(0); // Load 'this'
-                        cfw.add(
-                                ByteCode.GETFIELD,
-                                className,
-                                "idata",
-                                "Lorg/mozilla/javascript/InterpreterData;");
-                        cfw.add(
-                                ByteCode.GETFIELD,
-                                "org/mozilla/javascript/InterpreterData",
-                                "itsBigIntTable",
-                                "[Ljava/math/BigInteger;");
-                        cfw.addPush(0);
-                        cfw.add(ByteCode.AALOAD);
-                        cfw.addAStore(bigIntRegLocal);
+                        // Load bigInts[0] as a BigInteger object - inline at compile time
+                        if (idata.itsBigIntTable != null && idata.itsBigIntTable.length > 0) {
+                            java.math.BigInteger bigInt0 = idata.itsBigIntTable[0];
+                            cfw.add(ByteCode.NEW, "java/math/BigInteger");
+                            cfw.add(ByteCode.DUP);
+                            cfw.addPush(bigInt0.toString());
+                            cfw.addInvoke(
+                                    ByteCode.INVOKESPECIAL,
+                                    "java/math/BigInteger",
+                                    "<init>",
+                                    "(Ljava/lang/String;)V");
+                            cfw.addAStore(bigIntRegLocal);
+                        } else {
+                            cfw.add(ByteCode.ACONST_NULL);
+                            cfw.addAStore(bigIntRegLocal);
+                        }
                         pc++;
                         break;
                     case Icode_REG_BIGINT_C1:
-                        // Load bigInts[1] as a BigInteger object
-                        cfw.addALoad(0); // Load 'this'
-                        cfw.add(
-                                ByteCode.GETFIELD,
-                                className,
-                                "idata",
-                                "Lorg/mozilla/javascript/InterpreterData;");
-                        cfw.add(
-                                ByteCode.GETFIELD,
-                                "org/mozilla/javascript/InterpreterData",
-                                "itsBigIntTable",
-                                "[Ljava/math/BigInteger;");
-                        cfw.addPush(1);
-                        cfw.add(ByteCode.AALOAD);
-                        cfw.addAStore(bigIntRegLocal);
+                        // Load bigInts[1] as a BigInteger object - inline at compile time
+                        if (idata.itsBigIntTable != null && idata.itsBigIntTable.length > 1) {
+                            java.math.BigInteger bigInt1 = idata.itsBigIntTable[1];
+                            cfw.add(ByteCode.NEW, "java/math/BigInteger");
+                            cfw.add(ByteCode.DUP);
+                            cfw.addPush(bigInt1.toString());
+                            cfw.addInvoke(
+                                    ByteCode.INVOKESPECIAL,
+                                    "java/math/BigInteger",
+                                    "<init>",
+                                    "(Ljava/lang/String;)V");
+                            cfw.addAStore(bigIntRegLocal);
+                        } else {
+                            cfw.add(ByteCode.ACONST_NULL);
+                            cfw.addAStore(bigIntRegLocal);
+                        }
                         pc++;
                         break;
                     case Icode_REG_BIGINT_C2:
-                        // Load bigInts[2] as a BigInteger object
-                        cfw.addALoad(0); // Load 'this'
-                        cfw.add(
-                                ByteCode.GETFIELD,
-                                className,
-                                "idata",
-                                "Lorg/mozilla/javascript/InterpreterData;");
-                        cfw.add(
-                                ByteCode.GETFIELD,
-                                "org/mozilla/javascript/InterpreterData",
-                                "itsBigIntTable",
-                                "[Ljava/math/BigInteger;");
-                        cfw.addPush(2);
-                        cfw.add(ByteCode.AALOAD);
-                        cfw.addAStore(bigIntRegLocal);
+                        // Load bigInts[2] as a BigInteger object - inline at compile time
+                        if (idata.itsBigIntTable != null && idata.itsBigIntTable.length > 2) {
+                            java.math.BigInteger bigInt2 = idata.itsBigIntTable[2];
+                            cfw.add(ByteCode.NEW, "java/math/BigInteger");
+                            cfw.add(ByteCode.DUP);
+                            cfw.addPush(bigInt2.toString());
+                            cfw.addInvoke(
+                                    ByteCode.INVOKESPECIAL,
+                                    "java/math/BigInteger",
+                                    "<init>",
+                                    "(Ljava/lang/String;)V");
+                            cfw.addAStore(bigIntRegLocal);
+                        } else {
+                            cfw.add(ByteCode.ACONST_NULL);
+                            cfw.addAStore(bigIntRegLocal);
+                        }
                         pc++;
                         break;
                     case Icode_REG_BIGINT_C3:
-                        // Load bigInts[3] as a BigInteger object
-                        cfw.addALoad(0); // Load 'this'
-                        cfw.add(
-                                ByteCode.GETFIELD,
-                                className,
-                                "idata",
-                                "Lorg/mozilla/javascript/InterpreterData;");
-                        cfw.add(
-                                ByteCode.GETFIELD,
-                                "org/mozilla/javascript/InterpreterData",
-                                "itsBigIntTable",
-                                "[Ljava/math/BigInteger;");
-                        cfw.addPush(3);
-                        cfw.add(ByteCode.AALOAD);
-                        cfw.addAStore(bigIntRegLocal);
+                        // Load bigInts[3] as a BigInteger object - inline at compile time
+                        if (idata.itsBigIntTable != null && idata.itsBigIntTable.length > 3) {
+                            java.math.BigInteger bigInt3 = idata.itsBigIntTable[3];
+                            cfw.add(ByteCode.NEW, "java/math/BigInteger");
+                            cfw.add(ByteCode.DUP);
+                            cfw.addPush(bigInt3.toString());
+                            cfw.addInvoke(
+                                    ByteCode.INVOKESPECIAL,
+                                    "java/math/BigInteger",
+                                    "<init>",
+                                    "(Ljava/lang/String;)V");
+                            cfw.addAStore(bigIntRegLocal);
+                        } else {
+                            cfw.add(ByteCode.ACONST_NULL);
+                            cfw.addAStore(bigIntRegLocal);
+                        }
                         pc++;
                         break;
                     case Icode_REG_BIGINT1:
-                        // Load bigInts[pc] as a BigInteger object
+                        // Load bigInts[pc] as a BigInteger object - inline at compile time
                         varIndex = idata.itsICode[pc++] & 0xFF;
-                        cfw.addALoad(0); // Load 'this'
-                        cfw.add(
-                                ByteCode.GETFIELD,
-                                className,
-                                "idata",
-                                "Lorg/mozilla/javascript/InterpreterData;");
-                        cfw.add(
-                                ByteCode.GETFIELD,
-                                "org/mozilla/javascript/InterpreterData",
-                                "itsBigIntTable",
-                                "[Ljava/math/BigInteger;");
-                        cfw.addPush(varIndex);
+                        if (idata.itsBigIntTable != null && varIndex < idata.itsBigIntTable.length) {
+                            java.math.BigInteger bigIntValue = idata.itsBigIntTable[varIndex];
+                            cfw.add(ByteCode.NEW, "java/math/BigInteger");
+                            cfw.add(ByteCode.DUP);
+                            cfw.addPush(bigIntValue.toString());
+                            cfw.addInvoke(
+                                    ByteCode.INVOKESPECIAL,
+                                    "java/math/BigInteger",
+                                    "<init>",
+                                    "(Ljava/lang/String;)V");
+                            cfw.addAStore(bigIntRegLocal);
+                        } else {
+                            cfw.add(ByteCode.ACONST_NULL);
+                            cfw.addAStore(bigIntRegLocal);
+                        }
                         cfw.add(ByteCode.AALOAD);
                         cfw.addAStore(bigIntRegLocal);
                         break;
                     case Icode_REG_BIGINT2:
-                        // Load bigInts[getIndex(iCode, pc)] as a BigInteger object
+                        // Load bigInts[getIndex(iCode, pc)] as a BigInteger object - inline at compile time
                         varIndex =
                                 (idata.itsICode[pc] & 0xFF)
                                         | ((idata.itsICode[pc + 1] & 0xFF) << 8);
                         pc += 2;
-                        cfw.addALoad(0); // Load 'this'
-                        cfw.add(
-                                ByteCode.GETFIELD,
-                                className,
-                                "idata",
-                                "Lorg/mozilla/javascript/InterpreterData;");
-                        cfw.add(
-                                ByteCode.GETFIELD,
-                                "org/mozilla/javascript/InterpreterData",
-                                "itsBigIntTable",
-                                "[Ljava/math/BigInteger;");
-                        cfw.addPush(varIndex);
-                        cfw.add(ByteCode.AALOAD);
-                        cfw.addAStore(bigIntRegLocal);
+                        if (idata.itsBigIntTable != null && varIndex < idata.itsBigIntTable.length) {
+                            java.math.BigInteger bigInt2 = idata.itsBigIntTable[varIndex];
+                            cfw.add(ByteCode.NEW, "java/math/BigInteger");
+                            cfw.add(ByteCode.DUP);
+                            cfw.addPush(bigInt2.toString());
+                            cfw.addInvoke(
+                                    ByteCode.INVOKESPECIAL,
+                                    "java/math/BigInteger",
+                                    "<init>",
+                                    "(Ljava/lang/String;)V");
+                            cfw.addAStore(bigIntRegLocal);
+                        } else {
+                            cfw.add(ByteCode.ACONST_NULL);
+                            cfw.addAStore(bigIntRegLocal);
+                        }
                         break;
                     case Icode_REG_BIGINT4:
-                        // Load bigInts[getInt(iCode, pc)] as a BigInteger object
+                        // Load bigInts[getInt(iCode, pc)] as a BigInteger object - inline at compile time
                         varIndex =
                                 (idata.itsICode[pc] & 0xFF)
                                         | ((idata.itsICode[pc + 1] & 0xFF) << 8)
                                         | ((idata.itsICode[pc + 2] & 0xFF) << 16)
                                         | ((idata.itsICode[pc + 3] & 0xFF) << 24);
                         pc += 4;
-                        cfw.addALoad(0); // Load 'this'
-                        cfw.add(
-                                ByteCode.GETFIELD,
-                                className,
-                                "idata",
-                                "Lorg/mozilla/javascript/InterpreterData;");
-                        cfw.add(
-                                ByteCode.GETFIELD,
-                                "org/mozilla/javascript/InterpreterData",
-                                "itsBigIntTable",
-                                "[Ljava/math/BigInteger;");
-                        cfw.addPush(varIndex);
-                        cfw.add(ByteCode.AALOAD);
-                        cfw.addAStore(bigIntRegLocal);
+                        if (idata.itsBigIntTable != null && varIndex < idata.itsBigIntTable.length) {
+                            java.math.BigInteger bigInt4 = idata.itsBigIntTable[varIndex];
+                            cfw.add(ByteCode.NEW, "java/math/BigInteger");
+                            cfw.add(ByteCode.DUP);
+                            cfw.addPush(bigInt4.toString());
+                            cfw.addInvoke(
+                                    ByteCode.INVOKESPECIAL,
+                                    "java/math/BigInteger",
+                                    "<init>",
+                                    "(Ljava/lang/String;)V");
+                            cfw.addAStore(bigIntRegLocal);
+                        } else {
+                            cfw.add(ByteCode.ACONST_NULL);
+                            cfw.addAStore(bigIntRegLocal);
+                        }
                         break;
 
                     // Index register operations - load integer values into register
@@ -2925,11 +2823,13 @@ public class BytecodeToClassCompiler implements Context.FunctionCompiler {
                     };
             Class<?> clazz = loader.loadClass(className);
 
+            // No need to set static field - all values were inlined at compile time
+            
             // Create a new instance of the compiled function
             java.lang.reflect.Constructor<?> constructor =
-                    clazz.getConstructor(Scriptable.class, Context.class, int.class);
+                    clazz.getConstructor();
             NativeFunction compiledFunction =
-                    (NativeFunction) constructor.newInstance(scope, cx, 1);
+                    (NativeFunction) constructor.newInstance();
 
             // Set function properties to match IFnToClassCompiler behavior
             compiledFunction.setPrototypeProperty(ifun.getPrototypeProperty());
