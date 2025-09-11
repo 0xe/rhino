@@ -2270,9 +2270,9 @@ class BodyCodegen {
             if (child.getType() == Token.DOTDOTDOT) {
                 // Handle spread element: push the expression and call spread
                 cfw.add(ByteCode.DUP); // Duplicate the NewLiteralStorage
-                generateExpression(child.getFirstChild(), node);
                 cfw.addALoad(contextLocal);
                 cfw.addALoad(variableObjectLocal);
+                generateExpression(child.getFirstChild(), node);
                 cfw.addInvoke(
                         ByteCode.INVOKEVIRTUAL,
                         "org/mozilla/javascript/NewLiteralStorage",
@@ -2303,14 +2303,12 @@ class BodyCodegen {
 
         // Create the final array
         cfw.add(ByteCode.ACONST_NULL); // skipIndexes
-        cfw.add(ByteCode.ICONST_0); // skipCount
         cfw.addALoad(contextLocal);
         cfw.addALoad(variableObjectLocal);
         addOptRuntimeInvoke(
                 "newArrayLiteral",
                 "([Ljava/lang/Object;"
-                        + "Ljava/lang/String;"
-                        + "I"
+                        + "[I"
                         + "Lorg/mozilla/javascript/Context;"
                         + "Lorg/mozilla/javascript/Scriptable;"
                         + ")Lorg/mozilla/javascript/Scriptable;");
