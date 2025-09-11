@@ -6,11 +6,10 @@
 
 package org.mozilla.javascript.tests;
 
-import static org.junit.Assert.assertEquals;
-
 import org.junit.Test;
 import org.mozilla.javascript.Context;
 import org.mozilla.javascript.Scriptable;
+import org.mozilla.javascript.testutils.Utils;
 
 /** Tests for array literal spread syntax (...) functionality. */
 public class ArrayLiteralSpreadTest {
@@ -18,6 +17,7 @@ public class ArrayLiteralSpreadTest {
     private Object evaluateScript(String script) {
         Context cx = Context.enter();
         try {
+            cx.setInterpretedMode(true);
             cx.setLanguageVersion(Context.VERSION_ES6); // Enable ES6 features
             Scriptable scope = cx.initStandardObjects();
             return cx.evaluateString(scope, script, "test", 1, null);
@@ -33,7 +33,7 @@ public class ArrayLiteralSpreadTest {
                         + "var arr2 = [4, 5, 6];"
                         + "var result = [...arr1, ...arr2];"
                         + "result.join(',');";
-        assertEquals("1,2,3,4,5,6", evaluateScript(script));
+        Utils.assertWithAllModes("1,2,3,4,5,6", script);
     }
 
     @Test
@@ -43,13 +43,13 @@ public class ArrayLiteralSpreadTest {
                         + "var arr2 = [5, 6];"
                         + "var result = [1, ...arr1, 4, ...arr2, 7];"
                         + "result.join(',');";
-        assertEquals("1,2,3,4,5,6,7", evaluateScript(script));
+        Utils.assertWithAllModes("1,2,3,4,5,6,7", script);
     }
 
     @Test
     public void testEmptyArraySpread() {
         String script = "var empty = [];" + "var result = [...empty, 1, 2];" + "result.join(',');";
-        assertEquals("1,2", evaluateScript(script));
+        Utils.assertWithAllModes("1,2", script);
     }
 
     @Test
@@ -59,14 +59,14 @@ public class ArrayLiteralSpreadTest {
                         + "var empty2 = [];"
                         + "var result = [...empty1, ...empty2, 1];"
                         + "result.join(',');";
-        assertEquals("1", evaluateScript(script));
+        Utils.assertWithAllModes("1", script);
     }
 
     @Test
     public void testSingleElementSpread() {
         String script =
                 "var single = [42];" + "var result = [...single, ...single];" + "result.join(',');";
-        assertEquals("42,42", evaluateScript(script));
+        Utils.assertWithAllModes("42,42", script);
     }
 
     @Test
@@ -76,25 +76,25 @@ public class ArrayLiteralSpreadTest {
                         + "var arr2 = [4, 5];"
                         + "var result = [...arr1, ...arr2];"
                         + "result.length + ',' + result[0] + ',' + result[1].join('-') + ',' + result[2] + ',' + result[3];";
-        assertEquals("4,1,2-3,4,5", evaluateScript(script));
+        Utils.assertWithAllModes("4,1,2-3,4,5", script);
     }
 
     @Test
     public void testSpreadAtBeginning() {
         String script = "var arr = [1, 2];" + "var result = [...arr, 3, 4];" + "result.join(',');";
-        assertEquals("1,2,3,4", evaluateScript(script));
+        Utils.assertWithAllModes("1,2,3,4", script);
     }
 
     @Test
     public void testSpreadAtEnd() {
         String script = "var arr = [3, 4];" + "var result = [1, 2, ...arr];" + "result.join(',');";
-        assertEquals("1,2,3,4", evaluateScript(script));
+        Utils.assertWithAllModes("1,2,3,4", script);
     }
 
     @Test
     public void testSpreadInMiddle() {
         String script = "var arr = [2, 3];" + "var result = [1, ...arr, 4];" + "result.join(',');";
-        assertEquals("1,2,3,4", evaluateScript(script));
+        Utils.assertWithAllModes("1,2,3,4", script);
     }
 
     @Test
@@ -105,7 +105,7 @@ public class ArrayLiteralSpreadTest {
                         + "var arr3 = [5, 6];"
                         + "var result = [...arr1, ...arr2, ...arr3];"
                         + "result.join(',');";
-        assertEquals("1,2,3,4,5,6", evaluateScript(script));
+        Utils.assertWithAllModes("1,2,3,4,5,6", script);
     }
 
     @Test
@@ -114,7 +114,7 @@ public class ArrayLiteralSpreadTest {
                 "var sparse = [1, , 3];"
                         + "var result = [...sparse];"
                         + "result.length + ',' + result[0] + ',' + (result[1] === undefined) + ',' + result[2];";
-        assertEquals("3,1,true,3", evaluateScript(script));
+        Utils.assertWithAllModes("3,1,true,3", script);
     }
 
     @Test
@@ -124,28 +124,7 @@ public class ArrayLiteralSpreadTest {
                         + "for (var i = 0; i < 100; i++) arr.push(i);"
                         + "var result = [999, ...arr, 1000];"
                         + "result.length + ',' + result[0] + ',' + result[1] + ',' + result[100] + ',' + result[101];";
-        assertEquals("102,999,0,99,1000", evaluateScript(script));
-    }
-
-    @Test
-    public void testSpreadWithCompiledMode() {
-        Context cx = Context.enter();
-        try {
-            cx.setOptimizationLevel(9); // Force compiled mode
-            cx.setLanguageVersion(Context.VERSION_ES6);
-            Scriptable scope = cx.initStandardObjects();
-
-            String script =
-                    "var arr1 = [1, 2];"
-                            + "var arr2 = [3, 4];"
-                            + "var result = [...arr1, ...arr2];"
-                            + "result.join(',');";
-
-            Object result = cx.evaluateString(scope, script, "test", 1, null);
-            assertEquals("1,2,3,4", result);
-        } finally {
-            Context.exit();
-        }
+        Utils.assertWithAllModes("102,999,0,99,1000", script);
     }
 
     @Test
@@ -155,12 +134,12 @@ public class ArrayLiteralSpreadTest {
                         + "var arr = Array.prototype.slice.call(arrayLike);"
                         + "var result = ['x', ...arr, 'y'];"
                         + "result.join(',');";
-        assertEquals("x,a,b,c,y", evaluateScript(script));
+        Utils.assertWithAllModes("x,a,b,c,y", script);
     }
 
     @Test
     public void testSpreadOnlyArray() {
         String script = "var arr = [1, 2, 3];" + "var result = [...arr];" + "result.join(',');";
-        assertEquals("1,2,3", evaluateScript(script));
+        Utils.assertWithAllModes("1,2,3", script);
     }
 }
