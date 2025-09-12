@@ -283,13 +283,14 @@ class CodeGenerator extends Icode {
                 {
                     int fnIndex = node.getExistingIntProp(Node.FUNCTION_PROP);
                     int fnType = scriptOrFn.getFunctionNode(fnIndex).getFunctionType();
-                    // Only function expressions or function expression
-                    // statements need closure code creating new function
-                    // object on stack as function statements are initialized
+                    // Only function expressions, function expression statements,
+                    // and block-scoped function statements need closure code creating new function
+                    // object on stack as regular function statements are initialized
                     // at script/function start.
                     // In addition, function expressions can not be present here
                     // at statement level, they must only be present as expressions.
-                    if (fnType == FunctionNode.FUNCTION_EXPRESSION_STATEMENT) {
+                    if (fnType == FunctionNode.FUNCTION_EXPRESSION_STATEMENT 
+                            || fnType == FunctionNode.FUNCTION_STATEMENT_BLOCK) {
                         addIndexOp(Icode_CLOSURE_STMT, fnIndex);
                     } else {
                         if (fnType != FunctionNode.FUNCTION_STATEMENT) {

@@ -729,8 +729,16 @@ public class Parser {
                             n = scannedComments.get(scannedComments.size() - 1);
                             break;
                         case Token.FUNCTION:
+                            System.out.println("Parser: Found function declaration at any level");
                             consumeToken();
-                            n = function(FunctionNode.FUNCTION_STATEMENT);
+                            // Check if this function is declared inside a block (ES6+ block scoping)
+                            if (currentScope != currentScriptOrFn) {
+                                System.out.println("Parser: Function in block scope, using FUNCTION_STATEMENT_BLOCK");
+                                n = function(FunctionNode.FUNCTION_STATEMENT_BLOCK);
+                            } else {
+                                System.out.println("Parser: Function at script/function level, using FUNCTION_STATEMENT");
+                                n = function(FunctionNode.FUNCTION_STATEMENT);
+                            }
                             break;
                         default:
                             n = statement();
@@ -1389,8 +1397,16 @@ public class Parser {
                 return pn;
 
             case Token.FUNCTION:
+                System.out.println("Parser: Found FUNCTION_EXPRESSION_STATEMENT at statementHelper");
                 consumeToken();
-                return function(FunctionNode.FUNCTION_EXPRESSION_STATEMENT);
+                // Check if this function is declared inside a block (ES6+ block scoping)
+                if (currentScope != currentScriptOrFn) {
+                    System.out.println("Parser: Function expression in block scope, using FUNCTION_STATEMENT_BLOCK");
+                    return function(FunctionNode.FUNCTION_STATEMENT_BLOCK);
+                } else {
+                    System.out.println("Parser: Function expression at script/function level");
+                    return function(FunctionNode.FUNCTION_EXPRESSION_STATEMENT);
+                }
 
             case Token.DEFAULT:
                 pn = defaultXmlNamespace();

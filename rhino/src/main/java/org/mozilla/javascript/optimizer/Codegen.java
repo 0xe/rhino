@@ -190,7 +190,8 @@ public class Codegen implements Evaluator {
             int functionCount = tree.getFunctionCount();
             for (int i = 0; i != functionCount; ++i) {
                 OptFunctionNode ofn = OptFunctionNode.get(tree, i);
-                if (ofn.fnode.getFunctionType() == FunctionNode.FUNCTION_STATEMENT) {
+                if (ofn.fnode.getFunctionType() == FunctionNode.FUNCTION_STATEMENT 
+                        || ofn.fnode.getFunctionType() == FunctionNode.FUNCTION_STATEMENT_BLOCK) {
                     String name = ofn.fnode.getName();
                     if (name.length() != 0) {
                         if (possibleDirectCalls == null) {
