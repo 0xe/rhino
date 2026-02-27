@@ -102,4 +102,88 @@ class SharedOptimizerTest {
                 120.0,
                 "function factorial(n) { if (n <= 1) return 1; return n * factorial(n - 1); } factorial(5)");
     }
+
+    // --- Optimization-specific integration tests ---
+
+    @Test
+    void constantFolding() {
+        assertResultAtAllLevels(5.0, "function f() { var x = 2 + 3; return x; } f()");
+    }
+
+    @Test
+    void deadCodeAfterConstantFold() {
+        // LVN folds 2+3→5, DCE can then clean up any dead intermediates
+        assertResultAtAllLevels(
+                15.0, "function f() { var a = 2 + 3; var b = a * 3; return b; } f()");
+    }
+
+    @Test
+    void deadVariableElimination() {
+        // var unused = 1; should not affect result
+        assertResultAtAllLevels(42.0, "function f() { var unused = 1; var x = 42; return x; } f()");
+    }
+
+    @Test
+    void copyPropagation() {
+        assertResultAtAllLevels(
+                10.0, "function f() { var a = 5; var b = a; var c = b; return a + c; } f()");
+    }
+
+    @Test
+    void callPreservesSemantics() {
+        // Ensure CALL-based invalidation keeps correctness
+        assertResultAtAllLevels(
+                "hello", "function f() { var a = 'hello'; (function(){})(); return a; } f()");
+    }
+
+    @Test
+    void multipleConstantFolds() {
+        assertResultAtAllLevels(
+                50.0, "function f() { var a = 2 + 3; var b = 4 + 6; return a * b; } f()");
+    }
+
+    @Test
+    void optimizationsToggleOff() {
+        // Custom ContextFactory that disables shared optimizations
+        ContextFactory noOptFactory =
+                new ContextFactory() {
+                    @Override
+                    protected boolean hasFeature(Context cx, int featureIndex) {
+                        if (featureIndex == Context.FEATURE_SHARED_OPTIMIZATIONS) {
+                            return false;
+                        }
+                        return super.hasFeature(cx, featureIndex);
+                    }
+                };
+
+        for (int level : new int[] {-1, 9}) {
+            try (Context cx = noOptFactory.enterContext()) {
+                cx.setOptimizationLevel(level);
+                cx.setLanguageVersion(Context.VERSION_ES6);
+                Scriptable scope = cx.initStandardObjects();
+                Object result =
+                        cx.evaluateString(
+                                scope,
+                                "function f() { var x = 2 + 3; return x; } f()",
+                                "test",
+                                1,
+                                null);
+                assertEquals(5.0, ((Number) result).doubleValue(), "toggle off, level " + level);
+            }
+        }
+    }
+
+    @Test
+    void mixedArithmeticWithSideEffects() {
+        // Ensure side-effectful code mixed with optimizable code works correctly
+        assertResultAtAllLevels(
+                8.0,
+                "function f() {"
+                        + "  var result = [];"
+                        + "  var a = 2 + 3;"
+                        + "  result.push(a);"
+                        + "  var b = a + 3;"
+                        + "  return b;"
+                        + "} f()");
+    }
 }

@@ -348,6 +348,13 @@ public class Context implements Closeable {
      */
     public static final int FEATURE_INTL_402 = 22;
 
+    /**
+     * Controls whether shared optimization passes (LVN, DCE) run on the IR before code generation.
+     *
+     * @since 1.8.0
+     */
+    public static final int FEATURE_SHARED_OPTIMIZATIONS = 23;
+
     public static final String languageVersionProperty = "language version";
     public static final String errorReporterProperty = "error reporter";
 

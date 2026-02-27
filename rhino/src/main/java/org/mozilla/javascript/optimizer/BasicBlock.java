@@ -55,6 +55,22 @@ public class BasicBlock {
         return result;
     }
 
+    public int getStatementCount() {
+        return endIndex - startIndex + 1;
+    }
+
+    public Node getStatement(int i) {
+        return statements[startIndex + i];
+    }
+
+    public int getAbsoluteIndex(int i) {
+        return startIndex + i;
+    }
+
+    public void setStatement(int arrayIndex, Node node) {
+        statements[arrayIndex] = node;
+    }
+
     public List<BasicBlock> getSuccessors() {
         return Collections.unmodifiableList(successors);
     }

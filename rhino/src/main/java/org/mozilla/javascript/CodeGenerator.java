@@ -56,14 +56,14 @@ class CodeGenerator<T extends ScriptOrFn<T>> extends Icode {
     private static final Class<?> sharedOptimizerClass =
             Kit.classOrNull("org.mozilla.javascript.optimizer.SharedOptimizer");
 
-    private static void runSharedOptimizer(ScriptNode tree) {
+    private static void runSharedOptimizer(ScriptNode tree, CompilerEnvirons compilerEnv) {
         if (sharedOptimizerClass != null) {
             Object optimizer = Kit.newInstanceOrNull(sharedOptimizerClass);
             if (optimizer != null) {
                 try {
                     sharedOptimizerClass
-                            .getMethod("optimize", ScriptNode.class)
-                            .invoke(optimizer, tree);
+                            .getMethod("optimize", ScriptNode.class, CompilerEnvirons.class)
+                            .invoke(optimizer, tree, compilerEnv);
                 } catch (Exception e) {
                     throw new RuntimeException(e);
                 }
@@ -85,7 +85,7 @@ class CodeGenerator<T extends ScriptOrFn<T>> extends Icode {
 
         new NodeTransformer().transform(tree, compilerEnv);
 
-        runSharedOptimizer(tree);
+        runSharedOptimizer(tree, compilerEnv);
 
         if (Token.printTrees) {
             System.out.println("after transform:");

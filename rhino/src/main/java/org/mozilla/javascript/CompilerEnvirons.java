@@ -43,6 +43,7 @@ public class CompilerEnvirons {
         // Observer code generation in compiled code :
         generateObserverCount = cx.isGenerateObserverCount();
         securityController = cx.getSecurityController();
+        sharedOptimizations = cx.hasFeature(Context.FEATURE_SHARED_OPTIMIZATIONS);
     }
 
     public final ErrorReporter getErrorReporter() {
@@ -248,6 +249,14 @@ public class CompilerEnvirons {
         return allowSuper;
     }
 
+    public final boolean isSharedOptimizations() {
+        return sharedOptimizations;
+    }
+
+    public void setSharedOptimizations(boolean flag) {
+        sharedOptimizations = flag;
+    }
+
     public void setInEval(boolean inEval) {
         this.inEval = inEval;
     }
@@ -313,6 +322,7 @@ public class CompilerEnvirons {
     private boolean ideMode;
     private boolean allowSharpComments;
     private boolean allowSuper;
+    private boolean sharedOptimizations = true;
     Set<String> activationNames;
     private boolean inEval;
     private Scriptable homeObjecgt;

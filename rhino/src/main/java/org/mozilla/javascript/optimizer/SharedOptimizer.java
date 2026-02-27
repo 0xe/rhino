@@ -6,6 +6,7 @@ package org.mozilla.javascript.optimizer;
 
 import java.util.ArrayList;
 import java.util.List;
+import org.mozilla.javascript.CompilerEnvirons;
 import org.mozilla.javascript.Node;
 import org.mozilla.javascript.Token;
 import org.mozilla.javascript.ast.FunctionNode;
@@ -30,7 +31,10 @@ public class SharedOptimizer {
      * modification). Future lessons will add actual optimization passes (dead code elimination,
      * constant propagation, etc.).
      */
-    public void optimize(ScriptNode scriptOrFn) {
+    public void optimize(ScriptNode scriptOrFn, CompilerEnvirons compilerEnv) {
+        if (!compilerEnv.isSharedOptimizations()) {
+            return;
+        }
         int functionCount = scriptOrFn.getFunctionCount();
         for (int i = 0; i < functionCount; i++) {
             FunctionNode fn = scriptOrFn.getFunctionNode(i);
@@ -47,7 +51,9 @@ public class SharedOptimizer {
             return;
         }
 
-        BasicBlock.buildCFG(statementNodes);
+        List<BasicBlock> blocks = BasicBlock.buildCFG(statementNodes);
+        new LocalValueNumbering().run(blocks);
+        new DeadCodeElimination().run(blocks);
     }
 
     public static Node[] flattenStatements(Node node) {
