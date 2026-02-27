@@ -251,6 +251,8 @@ public class Codegen implements Evaluator {
         OptTransformer ot = new OptTransformer(possibleDirectCalls, directCallTargets);
         ot.transform(tree, compilerEnv);
 
+        new SharedOptimizer().optimize(tree);
+
         new Optimizer().optimize(tree);
     }
 

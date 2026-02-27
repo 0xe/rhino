@@ -53,6 +53,24 @@ class CodeGenerator<T extends ScriptOrFn<T>> extends Icode {
     // ECF_ or Expression Context Flags constants: for now only TAIL
     private static final int ECF_TAIL = 1 << 0;
 
+    private static final Class<?> sharedOptimizerClass =
+            Kit.classOrNull("org.mozilla.javascript.optimizer.SharedOptimizer");
+
+    private static void runSharedOptimizer(ScriptNode tree) {
+        if (sharedOptimizerClass != null) {
+            Object optimizer = Kit.newInstanceOrNull(sharedOptimizerClass);
+            if (optimizer != null) {
+                try {
+                    sharedOptimizerClass
+                            .getMethod("optimize", ScriptNode.class)
+                            .invoke(optimizer, tree);
+                } catch (Exception e) {
+                    throw new RuntimeException(e);
+                }
+            }
+        }
+    }
+
     public JSDescriptor<T> compile(
             CompilerEnvirons compilerEnv,
             ScriptNode tree,
@@ -66,6 +84,8 @@ class CodeGenerator<T extends ScriptOrFn<T>> extends Icode {
         }
 
         new NodeTransformer().transform(tree, compilerEnv);
+
+        runSharedOptimizer(tree);
 
         if (Token.printTrees) {
             System.out.println("after transform:");
