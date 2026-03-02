@@ -186,4 +186,14 @@ class SharedOptimizerTest {
                         + "  return b;"
                         + "} f()");
     }
+
+    @Test
+    void varHoistingNotBrokenByCopyProp() {
+        // Regression: testsrc/tests/ecma/Statements/12.2-1.js
+        // var x is hoisted in f(), so "var a = x" reads the local (undefined) x, not the outer x.
+        // Copy propagation must not replace "a" with "x" when x is later reassigned.
+        assertResultAtAllLevels(
+                "undefined",
+                "var x = 3;" + "function f() { var a = x; var x = 23; return typeof a; }" + "f()");
+    }
 }

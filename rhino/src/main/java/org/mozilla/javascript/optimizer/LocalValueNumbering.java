@@ -111,6 +111,13 @@ class LocalValueNumbering {
                 setvar.replaceChild(rhs, rewritten);
             }
 
+            // If this variable was the canonical name for its old VN, remove that mapping.
+            // Otherwise copy propagation could substitute a stale variable.
+            Integer oldVN = varToVN.get(varName);
+            if (oldVN != null && varName.equals(vnToVar.get(oldVN))) {
+                vnToVar.remove(oldVN);
+            }
+
             // Register this variable's value number
             varToVN.put(varName, vn);
             if (!vnToVar.containsKey(vn)) {
