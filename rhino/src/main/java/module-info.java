@@ -8,6 +8,7 @@ module org.mozilla.rhino {
     exports org.mozilla.javascript.commonjs.module;
     exports org.mozilla.javascript.commonjs.module.provider;
     exports org.mozilla.javascript.debug;
+    exports org.mozilla.javascript.debug.sourcemap;
     exports org.mozilla.javascript.optimizer;
     exports org.mozilla.javascript.serialize;
     exports org.mozilla.javascript.typedarrays;
