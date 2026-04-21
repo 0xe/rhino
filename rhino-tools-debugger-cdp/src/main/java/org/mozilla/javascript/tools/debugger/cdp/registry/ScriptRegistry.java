@@ -17,7 +17,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import org.mozilla.javascript.debug.DebuggableScript;
+import org.mozilla.javascript.debug.sourcemap.SourceMap;
 
 /**
  * Owns the mapping from CDP {@code scriptId} (decimal string) to the compiled {@link
@@ -26,10 +29,27 @@ import org.mozilla.javascript.debug.DebuggableScript;
  */
 public final class ScriptRegistry {
 
+    private static final Logger LOG = Logger.getLogger(ScriptRegistry.class.getName());
+
+    /**
+     * Resolves a source-map URL (as extracted from {@code //# sourceMappingURL=}) against the
+     * owning script's URL, fetches the raw source-map JSON, and returns it. Returning {@code null}
+     * leaves the script without a parsed map. Embedders supply one via the CDP config.
+     */
+    @FunctionalInterface
+    public interface SourceMapResolver {
+        String fetch(String scriptUrl, String sourceMapUrl);
+    }
+
     private final AtomicInteger nextId = new AtomicInteger(1);
     private final Map<String, ScriptRecord> byId = new HashMap<>();
     private final Map<DebuggableScript, ScriptRecord> byScript = new HashMap<>();
     private final Map<String, List<ScriptRecord>> byUrl = new HashMap<>();
+    private volatile SourceMapResolver sourceMapResolver;
+
+    public void setSourceMapResolver(SourceMapResolver resolver) {
+        this.sourceMapResolver = resolver;
+    }
 
     public synchronized ScriptRecord register(DebuggableScript top, String source) {
         ScriptRecord existing = byScript.get(top);
@@ -42,6 +62,7 @@ public final class ScriptRegistry {
         int[] validLines = collectValidLines(top);
         int endLine = maxLine(validLines);
         String hash = sha256Hex(source == null ? "" : source);
+        SourceMap sourceMap = resolveSourceMap(url, mappingURL);
         ScriptRecord rec =
                 new ScriptRecord(
                         id,
@@ -52,11 +73,30 @@ public final class ScriptRegistry {
                         validLines,
                         endLine,
                         mappingURL,
-                        sourceURLOverride);
+                        sourceURLOverride,
+                        sourceMap);
         byId.put(id, rec);
         byScript.put(top, rec);
         byUrl.computeIfAbsent(url, k -> new ArrayList<>()).add(rec);
         return rec;
+    }
+
+    private SourceMap resolveSourceMap(String scriptUrl, String mapUrl) {
+        if (mapUrl == null) return null;
+        try {
+            // Inline data: URIs can always be decoded without an embedder-provided fetcher.
+            if (mapUrl.startsWith("data:")) {
+                return SourceMap.parseDataUri(mapUrl);
+            }
+            SourceMapResolver resolver = this.sourceMapResolver;
+            if (resolver == null) return null;
+            String json = resolver.fetch(scriptUrl, mapUrl);
+            if (json == null) return null;
+            return SourceMap.parse(json);
+        } catch (RuntimeException e) {
+            LOG.log(Level.FINE, "failed to resolve source map for " + scriptUrl, e);
+            return null;
+        }
     }
 
     public synchronized ScriptRecord getById(String scriptId) {

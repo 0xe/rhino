@@ -6,7 +6,7 @@
 
 package org.mozilla.javascript.tools.debugger.cdp;
 
-import java.util.function.Function;
+import org.mozilla.javascript.tools.debugger.cdp.registry.ScriptRegistry;
 
 public final class CdpDebuggerConfig {
     public int port = 9222;
@@ -18,8 +18,13 @@ public final class CdpDebuggerConfig {
      */
     public boolean waitForAttach = false;
 
-    /** Reserved for source-map phase. Fetches a source-map URL to its raw JSON content. */
-    public Function<String, String> sourceMapFetcher = null;
+    /**
+     * Fetches a source-map URL to its raw JSON content. Called at script registration with the
+     * owning script's URL and the {@code sourceMappingURL} directive value. Returning {@code null}
+     * leaves the script without a parsed map. Inline {@code data:} URIs are decoded without calling
+     * this resolver.
+     */
+    public ScriptRegistry.SourceMapResolver sourceMapFetcher = null;
 
     /** Reserved: inline maps as {@code data:} URIs in {@code scriptParsed} events. */
     public boolean inlineSourceMapsInEvents = false;

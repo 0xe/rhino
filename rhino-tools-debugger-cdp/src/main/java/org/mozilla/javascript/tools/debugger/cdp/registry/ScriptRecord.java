@@ -8,6 +8,7 @@ package org.mozilla.javascript.tools.debugger.cdp.registry;
 
 import java.util.Arrays;
 import org.mozilla.javascript.debug.DebuggableScript;
+import org.mozilla.javascript.debug.sourcemap.SourceMap;
 
 public final class ScriptRecord {
     public final String scriptId;
@@ -20,6 +21,9 @@ public final class ScriptRecord {
     public final String sourceMappingURL;
     public final String sourceURLOverride;
 
+    /** Parsed map, if the registry was able to fetch + parse it. May be {@code null}. */
+    public final SourceMap sourceMap;
+
     public ScriptRecord(
             String scriptId,
             String url,
@@ -29,7 +33,8 @@ public final class ScriptRecord {
             int[] validLines,
             int endLine,
             String sourceMappingURL,
-            String sourceURLOverride) {
+            String sourceURLOverride,
+            SourceMap sourceMap) {
         this.scriptId = scriptId;
         this.url = url;
         this.source = source;
@@ -39,6 +44,7 @@ public final class ScriptRecord {
         this.endLine = endLine;
         this.sourceMappingURL = sourceMappingURL;
         this.sourceURLOverride = sourceURLOverride;
+        this.sourceMap = sourceMap;
     }
 
     /** Snap the requested line to the nearest valid line at or after it. */

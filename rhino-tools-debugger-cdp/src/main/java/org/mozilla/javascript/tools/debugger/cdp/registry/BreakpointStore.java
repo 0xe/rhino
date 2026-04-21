@@ -12,6 +12,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Pattern;
+import org.mozilla.javascript.debug.sourcemap.Mapping;
 
 public final class BreakpointStore {
 
@@ -61,6 +62,19 @@ public final class BreakpointStore {
         return bp;
     }
 
+    /**
+     * Binds an already-added URL breakpoint to a specific (script, generatedLine) pair — used by
+     * the source-map translation path, where the breakpoint's URL matches an <em>original</em>
+     * source rather than the script's URL. The generated line is snapped to the nearest valid line
+     * on that script.
+     */
+    public synchronized void bindAt(Breakpoint bp, ScriptRecord rec, int generatedLine) {
+        int snapped = rec.snapLine(generatedLine);
+        bp.resolvedScriptId = rec.scriptId;
+        bp.resolvedLine = snapped;
+        byScriptId.computeIfAbsent(rec.scriptId, k -> new ArrayList<>()).add(bp);
+    }
+
     public synchronized void remove(String id) {
         Breakpoint bp = byId.remove(id);
         if (bp == null) return;
@@ -82,10 +96,26 @@ public final class BreakpointStore {
         return out;
     }
 
-    /** Called when a new script is registered; resolves any pending URL breakpoints that match. */
+    /**
+     * Called when a new script is registered; resolves any pending URL breakpoints that match —
+     * either by direct URL match on the script's URL or, if the script has a source map, by the
+     * breakpoint's URL matching one of the map's original sources.
+     */
     public synchronized List<Breakpoint> onNewScript(ScriptRecord rec) {
         List<Breakpoint> resolved = new ArrayList<>();
         for (Breakpoint bp : new ArrayList<>(urlPending)) {
+            // Source-map path (literal URL breakpoints only).
+            if (!bp.isRegex && rec.sourceMap != null) {
+                List<Mapping> gen = rec.sourceMap.generatedFor(bp.scriptIdOrUrl, bp.line);
+                if (!gen.isEmpty()) {
+                    for (Mapping m : gen) {
+                        bindAt(bp, rec, m.generatedLine);
+                    }
+                    resolved.add(bp);
+                    continue;
+                }
+            }
+            // Plain URL match fallback.
             Pattern compiled = null;
             if (bp.isRegex) {
                 try {

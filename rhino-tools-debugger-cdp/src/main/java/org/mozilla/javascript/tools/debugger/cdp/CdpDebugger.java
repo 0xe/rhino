@@ -83,6 +83,9 @@ public final class CdpDebugger implements Closeable {
         this.cfg = cfg;
 
         this.registry = new ScriptRegistry();
+        if (cfg.sourceMapFetcher != null) {
+            this.registry.setSourceMapResolver(cfg.sourceMapFetcher);
+        }
         this.breakpoints = new BreakpointStore();
         this.objectStore = new RemoteObjectStore();
 

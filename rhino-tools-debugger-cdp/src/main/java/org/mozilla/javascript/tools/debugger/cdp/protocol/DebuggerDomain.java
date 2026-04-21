@@ -15,6 +15,8 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import org.mozilla.javascript.Scriptable;
+import org.mozilla.javascript.debug.sourcemap.Mapping;
+import org.mozilla.javascript.debug.sourcemap.SourceMap;
 import org.mozilla.javascript.tools.debugger.cdp.pause.EvalRequest;
 import org.mozilla.javascript.tools.debugger.cdp.pause.EvalResult;
 import org.mozilla.javascript.tools.debugger.cdp.pause.PauseController;
@@ -174,29 +176,66 @@ public final class DebuggerDomain implements DomainHandler {
             replier.err(-32602, "url or urlRegex required");
             return;
         }
-        List<ScriptRecord> matches = new ArrayList<>();
-        if (isRegex) {
+
+        // Source-map translation: if a literal `url` matches an original source referenced by any
+        // loaded script's source map, translate (origLine) into one or more generated locations on
+        // the underlying compiled script and bind the breakpoint explicitly to that script.
+        List<Map<String, Object>> locations = new ArrayList<>();
+        List<ScriptRecord> urlMatches = new ArrayList<>();
+        List<SourceMapBinding> sourceMapBindings = new ArrayList<>();
+        if (!isRegex && url != null) {
             for (ScriptRecord r : registry.all()) {
-                try {
-                    if (java.util.regex.Pattern.compile(urlRegex).matcher(r.url).find()) {
-                        matches.add(r);
-                    }
-                } catch (RuntimeException ignored) {
+                SourceMap sm = r.sourceMap;
+                if (sm == null) continue;
+                List<Mapping> gen = sm.generatedFor(url, line);
+                if (gen.isEmpty()) continue;
+                for (Mapping m : gen) {
+                    int snapped = r.snapLine(m.generatedLine);
+                    locations.add(makeLocation(r.scriptId, snapped, m.generatedColumn));
+                    sourceMapBindings.add(new SourceMapBinding(r, snapped));
                 }
             }
-        } else {
-            matches.addAll(registry.findByUrl(url));
         }
-        Breakpoint bp = breakpoints.addByUrl(pattern, line, col, cond, isRegex, matches);
-        List<Map<String, Object>> locations = new ArrayList<>();
-        for (ScriptRecord r : matches) {
-            int snapped = r.snapLine(line);
-            locations.add(makeLocation(r.scriptId, snapped, col));
+
+        // Fall-through: plain URL match (no source map involvement).
+        if (sourceMapBindings.isEmpty()) {
+            if (isRegex) {
+                for (ScriptRecord r : registry.all()) {
+                    try {
+                        if (java.util.regex.Pattern.compile(urlRegex).matcher(r.url).find()) {
+                            urlMatches.add(r);
+                        }
+                    } catch (RuntimeException ignored) {
+                    }
+                }
+            } else {
+                urlMatches.addAll(registry.findByUrl(url));
+            }
+            for (ScriptRecord r : urlMatches) {
+                int snapped = r.snapLine(line);
+                locations.add(makeLocation(r.scriptId, snapped, col));
+            }
         }
+
+        Breakpoint bp = breakpoints.addByUrl(pattern, line, col, cond, isRegex, urlMatches);
+        for (SourceMapBinding b : sourceMapBindings) {
+            breakpoints.bindAt(bp, b.rec, b.generatedLine);
+        }
+
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("breakpointId", bp.id);
         out.put("locations", locations);
         replier.ok(out);
+    }
+
+    private static final class SourceMapBinding {
+        final ScriptRecord rec;
+        final int generatedLine;
+
+        SourceMapBinding(ScriptRecord rec, int generatedLine) {
+            this.rec = rec;
+            this.generatedLine = generatedLine;
+        }
     }
 
     private void handleRemoveBreakpoint(Scriptable params, CdpTransport.Replier replier) {
