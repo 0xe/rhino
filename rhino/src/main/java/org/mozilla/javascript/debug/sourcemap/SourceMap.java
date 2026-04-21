@@ -67,16 +67,25 @@ public final class SourceMap {
     // ---- Parsing -------------------------------------------------------
 
     public static SourceMap parse(String json) {
+        return parse(json, null);
+    }
+
+    /**
+     * Parse a source map and resolve relative {@code sources[]} entries against {@code baseUrl}.
+     * The base URL should be the absolute URL of the map file itself (or the owning script's URL
+     * for inline {@code data:} maps). Entries that already carry a scheme or an absolute path are
+     * left alone.
+     */
+    public static SourceMap parse(String json, String baseUrl) {
         Object root = MiniJson.parse(json);
         if (!(root instanceof Map)) {
             throw new SourceMapException("source map root must be an object");
         }
         @SuppressWarnings("unchecked")
         Map<String, Object> obj = (Map<String, Object>) root;
-        if (obj.containsKey("sections")) {
-            return parseSectioned(obj);
-        }
-        return parseRegular(obj);
+        SourceMap sm = obj.containsKey("sections") ? parseSectioned(obj) : parseRegular(obj);
+        if (baseUrl != null) sm = sm.withBaseUrl(baseUrl);
+        return sm;
     }
 
     public static SourceMap parseIndexed(String json) {
@@ -414,6 +423,38 @@ public final class SourceMap {
 
     public List<String> sources() {
         return sources;
+    }
+
+    /**
+     * Returns a new {@code SourceMap} with the same mappings but {@code sources[]} resolved against
+     * the given base URL. Entries that already carry a URL scheme or start with "/" are left
+     * untouched. Used by the CDP registry so that relative {@code sources[]} become the same
+     * absolute URLs DevTools uses in breakpoint requests.
+     */
+    public SourceMap withBaseUrl(String baseUrl) {
+        if (baseUrl == null) return this;
+        List<String> resolved = new ArrayList<>(sources.size());
+        for (String s : sources) {
+            resolved.add(resolveAgainst(baseUrl, s));
+        }
+        return new SourceMap(file, resolved, names, sourcesContent, linesByGen);
+    }
+
+    private static String resolveAgainst(String baseUrl, String rel) {
+        if (rel == null || rel.isEmpty()) return rel;
+        if (hasScheme(rel) || rel.startsWith("/")) return rel;
+        try {
+            java.net.URI base = java.net.URI.create(baseUrl);
+            String resolved = base.resolve(rel).toString();
+            // java.net.URI normalizes "file:///foo" to "file:/foo". DevTools uses the
+            // triple-slash form, so we restore it to keep URL comparisons equal.
+            if (resolved.startsWith("file:/") && !resolved.startsWith("file:///")) {
+                resolved = "file://" + resolved.substring("file:".length());
+            }
+            return resolved;
+        } catch (IllegalArgumentException e) {
+            return rel;
+        }
     }
 
     public List<String> names() {

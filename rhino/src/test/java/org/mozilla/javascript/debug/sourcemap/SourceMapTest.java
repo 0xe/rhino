@@ -229,6 +229,17 @@ public class SourceMapTest {
     }
 
     @Test
+    public void withBaseUrlResolvesRelativeSourcesAgainstMapUrl() {
+        String json =
+                "{\"version\":3,\"sources\":[\"original.js\",\"/abs.js\",\"https://x/y.js\"],"
+                        + "\"names\":[],\"mappings\":\"AAAA\"}";
+        SourceMap sm = SourceMap.parse(json, "file:///project/build/generated.js.map");
+        assertEquals(
+                List.of("file:///project/build/original.js", "/abs.js", "https://x/y.js"),
+                sm.sources());
+    }
+
+    @Test
     public void rejectsUnsupportedVersion() {
         String json = "{\"version\":2,\"sources\":[\"a.js\"],\"names\":[],\"mappings\":\"\"}";
         assertThrows(SourceMapException.class, () -> SourceMap.parse(json));

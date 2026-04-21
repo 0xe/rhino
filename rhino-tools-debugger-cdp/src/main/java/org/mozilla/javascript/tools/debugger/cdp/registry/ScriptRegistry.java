@@ -84,15 +84,23 @@ public final class ScriptRegistry {
     private SourceMap resolveSourceMap(String scriptUrl, String mapUrl) {
         if (mapUrl == null) return null;
         try {
-            // Inline data: URIs can always be decoded without an embedder-provided fetcher.
+            // Inline data: URIs — resolve relative sources[] against the script URL, which is
+            // the closest thing to a map URL we have for inline maps.
             if (mapUrl.startsWith("data:")) {
-                return SourceMap.parseDataUri(mapUrl);
+                SourceMap sm = SourceMap.parseDataUri(mapUrl);
+                return sm.withBaseUrl(scriptUrl);
             }
             SourceMapResolver resolver = this.sourceMapResolver;
             if (resolver == null) return null;
             String json = resolver.fetch(scriptUrl, mapUrl);
             if (json == null) return null;
-            return SourceMap.parse(json);
+            // Resolve the absolute map URL (for resolving sources[] entries).
+            String absoluteMapUrl = mapUrl;
+            try {
+                absoluteMapUrl = java.net.URI.create(scriptUrl).resolve(mapUrl).toString();
+            } catch (IllegalArgumentException ignored) {
+            }
+            return SourceMap.parse(json, absoluteMapUrl);
         } catch (RuntimeException e) {
             LOG.log(Level.FINE, "failed to resolve source map for " + scriptUrl, e);
             return null;
