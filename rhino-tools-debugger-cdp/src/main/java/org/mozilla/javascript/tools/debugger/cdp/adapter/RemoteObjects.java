@@ -56,7 +56,7 @@ public final class RemoteObjects {
         if (value instanceof Scriptable) {
             Scriptable s = (Scriptable) value;
             m.put("type", "object");
-            m.put("className", s.getClassName());
+            m.put("className", safeClassName(s));
             m.put("description", describe(s));
             m.put("objectId", store.register(s, group));
             return m;
@@ -82,7 +82,7 @@ public final class RemoteObjects {
     }
 
     private static String describe(Scriptable s) {
-        String cn = s.getClassName();
+        String cn = safeClassName(s);
         if ("Array".equals(cn)) {
             Object len = ScriptableObject.getProperty(s, "length");
             if (len instanceof Number) {
@@ -90,5 +90,15 @@ public final class RemoteObjects {
             }
         }
         return cn;
+    }
+
+    private static String safeClassName(Scriptable s) {
+        // VarScope.getClassName() throws — and prints a stack trace before throwing. Detect
+        // that class of scope directly so we don't drag noise into stderr on every paused
+        // scope wrap.
+        if (s instanceof org.mozilla.javascript.VarScope) {
+            return s.getClass().getSimpleName();
+        }
+        return s.getClassName();
     }
 }

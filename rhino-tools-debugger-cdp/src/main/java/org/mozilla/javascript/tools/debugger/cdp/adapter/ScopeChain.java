@@ -12,6 +12,7 @@ import java.util.List;
 import java.util.Map;
 import org.mozilla.javascript.NativeWith;
 import org.mozilla.javascript.Scriptable;
+import org.mozilla.javascript.VarScope;
 
 /**
  * Walks a {@link CdpDebugFrame}'s activation chain and produces a CDP {@code scopeChain} array of
@@ -43,8 +44,13 @@ public final class ScopeChain {
             entry.put("type", type);
             Map<String, Object> ro = new LinkedHashMap<>();
             ro.put("type", "object");
-            ro.put("className", s.getClassName());
-            ro.put("description", s.getClassName());
+            // VarScope implementations (DeclarationScope, internal activations) forbid
+            // getClassName() — the default throws and prints to stderr before throwing — so
+            // short-circuit with the Java simple name for those.
+            String className =
+                    s instanceof VarScope ? s.getClass().getSimpleName() : s.getClassName();
+            ro.put("className", className);
+            ro.put("description", className);
             ro.put("objectId", store.register(s, group));
             entry.put("object", ro);
             chain.add(entry);
